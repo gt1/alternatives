@@ -37,8 +37,8 @@ The program will then construct an overlap graph and extract path alternatives
 in files prefixed by reads_bubbles_multi_indel_. These files are stored in the FastA
 format. A complete example can be found in the script example.sh in the source tree .
 A multiple alignment tool like mafft can be used to show indels in the assembled
-alternatives. The example.sh script for instance produces such a file with the following
-region:
+alternatives. The example.sh script for instance produces such a file
+(BRCA2mod_filtered_bubbles_multi_indel_48_0_0_0.clustal) with the following region:
 
 ```
 0_0_0           atatggcttataaaatattaatgtgcttctgttttatactttaacaggatttggaaaaac
