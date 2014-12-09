@@ -36,5 +36,24 @@ as input. This .hwt file can be produced using
 The program will then construct an overlap graph and extract path alternatives
 in files prefixed by reads_bubbles_multi_indel_. These files are stored in the FastA
 format. A complete example can be found in the script example.sh in the source tree .
+A multiple alignment tool like mafft can be used to show indels in the assembled
+alternatives. The example.sh script for instance produces such a file with the following
+region:
 
+```
+0_0_0           atatggcttataaaatattaatgtgcttctgttttatactttaacaggatttggaaaaac
+0_0_1           atatggcttataaaatattaatgtgcttctgttttatactttaacaggatttggaaaaac
+                ************************************************************
 
+0_0_0           atcagggaattcatttaaagtaaa------------------------------------
+0_0_1           atcagggaattcatttaaagtaaatagctgcaaagaccacagaaaaacatcagggaattc
+                ************************                                    
+
+0_0_0           ------------tagctgcaaagaccacattggaaagtcaatgccaaatgtcctagaaga
+0_0_1           atttaaagtaaatagctgcaaagaccacattggaaagtcaatgccaaatgtcctagaaga
+                            ************************************************
+
+0_0_0           tgaagtatatgaaacagttgtagatacctctgaagaagatagtttttcattatgtttttc
+0_0_1           tgaagtatatgaaacagttgtagatacctctgaagaagatagtttttcattatgtttttc
+                ************************************************************
+```
