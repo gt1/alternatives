@@ -275,7 +275,7 @@ function randomreads
 }'
 }
 
-
+# generate read set
 function genemod
 {
 # exon 10
@@ -302,6 +302,8 @@ CRANGE=`zcat refFlat.txt.gz | awk -v GENE=BRCA1 '{ if ( match($0,GENE "\t") ) pr
 # BRCA2 with a 48 base tandem repeat in exon10
 # in addition we add some off target data to be filtered out
 # before computing alternatives
+# the reads are mapped to the human reference using BWA mem
+# the resulting SAM files is sorted by coordinate and converted to BAM
 if [ ! -f ${GENE}mod.bam ] ; then
 	genemod | bwa-0.7.10/bwa mem -p GRCH38.fa - | biobambam/bin/bamsort inputformat=sam > ${GENE}mod.bam
 fi
@@ -320,29 +322,38 @@ RANGE=`zcat refFlat.txt.gz | awk -v GENE=${GENE} '{ if ( match($0,GENE "\t") ) p
 
 if [ ! -f ${FILTERED} ] ; then
 	if [ ! -f ${REMAPPED} ] ; then
+		# convert BAM to FastQ, modify names to hide pair information fro BWA,
+		# map reads as single end
+		# sort by coordinate
 		biobambam/bin/bamtofastq O=/dev/null O2=/dev/null S=/dev/null < ${INPUT} | \
 			awk 'NR%4==1 {sub(/\/1$/,"_one",$0) ; sub(/\/2$/,"_two",$0) ; print} NR%4!=1 {print}' |\
 			${BWA} mem -t ${PROC} GRCH38.fa - | \
 			biobambam/bin/bamsort index=1 indexfilename=${REMAPPED}.bai inputformat=sam calmdnm=1 fixmates=1 calmdnmreference=GRCH37.fa sortthreads=${PROC} >${REMAPPED}
 	fi
 
+	# extract range around target and save names where at least one end map to the target region
 	biobambam/bin/bamcollate2 ranges="${RANGE}" I=${REMAPPED} | samtools-1.1/samtools view -h - | awk -F '\t' '!/@/{sub(/_one|_two/,"",$1) ; print $1}' | sort -u > ${NAMES}
+	# filter reads with matching names from BAM file
 	biobambam/bin/bamfilternames <${INPUT} names=${NAMES} outputthreads=${PROC} >${FILTERED}
 	rm -f ${NAMES} ${REMAPPED} ${REMAPPED}.bai
 fi
 
 if [ ! -f ${FILTERED}.fa.gz ] ; then
+	# extract reads as FastA
 	biobambam/bin/bamtofastq < "${FILTERED}" fasta=1 O=/dev/null O2=/dev/null S=/dev/null | gzip -9 > ${FILTERED%.bam}.fa.gz
 fi
 
 if [ ! -f ${FILTERED%.bam}.compact ] ; then
+	# convert FastA to compact packed representation
 	bwtb3m/bin/fagzToCompact verbose=0 outputfilename=${FILTERED%.bam}.compact ${FILTERED%.bam}.fa.gz
 fi
 
 if [ ! -f ${FILTERED%.bam}.bwt ] ; then
+	# compute BWT of read set
 	${BWTB3M} inputtype=compactstream sasamplingrate=32 isasamplingrate=32 outputfilename=${FILTERED%.bam}.bwt numthreads=1 ${FILTERED%.bam}.compact
 fi
 
+# compile alternatives program
 if [ ! -f alternatives/bin/alternatives ] ; then
 	wget -O - https://github.com/gt1/alternatives/archive/${ALTERNATIVESVERSION}.tar.gz | tar xzf -
 	mv alternatives-${ALTERNATIVESVERSION} alternatives-${ALTERNATIVESVERSION}-src
@@ -355,11 +366,13 @@ if [ ! -f alternatives/bin/alternatives ] ; then
 fi
 
 if [ ! -f ${FILTERED%.bam}.dot.gz ] ; then
+	# compute assembly (overlap) graph and extract alternatives
 	alternatives/bin/alternatives k=20 minreqscore=125 ${FILTERED%.bam}.hwt | gzip -9 > ${FILTERED%.bam}.dot.gz
 fi
 
 if [ -e `which neato` ] ; then
 	if [ ! -f ${FILTERED%.bam}.svg.gz ] ; then
+		# produce layout using graphviz
 		zcat ${FILTERED%.bam}.dot.gz | sed 's|graph {|graph { layout="sfdp";|' | neato -Tsvg | gzip -9 > ${FILTERED%.bam}.svg.gz
 	fi
 else
