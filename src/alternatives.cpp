@@ -1,5 +1,5 @@
 /*
-    bwtb3m
+    alternatives
     Copyright (C) 2009-2014 German Tischler
     Copyright (C) 2011-2014 Genome Research Limited
 
