@@ -20,7 +20,7 @@ fi
 # download human reference and rename chromosomes
 if [ ! -f GRCH38.fa ] ; then
 	( for i in `seq 1 22` X Y ; do
-		wget -O - ftp://ftp.ncbi.nlm.nih.gov/genbank/genomes/Eukaryotes/vertebrates_mammals/Homo_sapiens/GRCh38/Primary_Assembly/assembled_chromosomes/FASTA/chr${i}.fa.gz
+		wget -O - ftp://ftp.ncbi.nlm.nih.gov/genomes/archive/old_genbank/Eukaryotes/vertebrates_mammals/Homo_sapiens/GRCh38/Primary_Assembly/assembled_chromosomes/FASTA/chr${i}.fa.gz
 	done ) | gzip -d -c | awk '/^>/ {V=$0 ; sub(/.*chromosome /,">chr",V) ; sub(/,.*/,"",V) ; print V } !/^>/ {print}' > GRCH38.fa
 fi
 
