@@ -1,12 +1,13 @@
 #! /bin/bash
 BUILDDIR=$PWD
-LIBMAUSVERSION=0.0.185-release-20141201090944
-BIOBAMBAMVERSION=0.0.183-release-20141208165400
-BWTB3MVERSION=0.0.0-release-20141208124650
-ALTERNATIVESVERSION=0.0.0-release-20141208163100
+LIBMAUS2VERSION=2.0.175-release-20160426230024
+BIOBAMBAM2VERSION=2.0.40-release-20160425112514
+BWTB3MVERSION=0.0.37-release-20160426231355
+ALTERNATIVESVERSION=0.0.2-release-20160427104438
 MAFFTURL=http://mafft.cbrc.jp/alignment/software/mafft-7.213-without-extensions-src.tgz
-BWAVERSION=0.7.10
+BWAVERSION=0.7.13
 MEMGB=8
+SAMTOOLSVERSION=1.3.1
 export GENE=BRCA2
 
 # number of processors on machine
@@ -24,41 +25,60 @@ if [ ! -f GRCH38.fa ] ; then
 	done ) | gzip -d -c | awk '/^>/ {V=$0 ; sub(/.*chromosome /,">chr",V) ; sub(/,.*/,"",V) ; print V } !/^>/ {print}' > GRCH38.fa
 fi
 
-# build libmaus
-if [ ! -f libmaus/lib/libmaus.a ] ; then
-	wget -O - https://github.com/gt1/libmaus/archive/${LIBMAUSVERSION}.tar.gz | tar xzf -
-	mv libmaus-${LIBMAUSVERSION} libmaus-${LIBMAUSVERSION}-src
-	mkdir libmaus-${LIBMAUSVERSION}-build
-	cd libmaus-${LIBMAUSVERSION}-build
-	../libmaus-${LIBMAUSVERSION}-src/configure --prefix=${BUILDDIR}/libmaus --disable-compile-testprograms
+if [ ! -e tools/bin/pkg-config ] ; then
+	curl --location https://pkg-config.freedesktop.org/releases/pkg-config-0.29.1.tar.gz | tar xzvf -
+	cd pkg-config-0.29.1
+	./configure --with-internal-glib --prefix=${BUILDDIR}/tools
 	make -j${PROC} install
 	cd ..
-	rm -fR libmaus-${LIBMAUSVERSION}-src libmaus-${LIBMAUSVERSION}-build
+	rm -fR pkg-config-0.29.1
+fi
+
+export PATH=${BUILDDIR}/tools/bin:$PATH
+
+if [ ! -e tools/lib/libz.a ] ; then
+	curl --location http://downloads.sourceforge.net/project/libpng/zlib/1.2.8/zlib-1.2.8.tar.gz | tar xzvf -
+	cd zlib-1.2.8
+	./configure --prefix=${BUILDDIR}/tools
+	make install
+	cd ..
+fi
+
+# build libmaus2
+if [ ! -f libmaus2/lib/libmaus2.a ] ; then
+	wget -O - https://github.com/gt1/libmaus2/archive/${LIBMAUS2VERSION}.tar.gz | tar xzf -
+	mv libmaus2-${LIBMAUS2VERSION} libmaus2-${LIBMAUS2VERSION}-src
+	mkdir libmaus2-${LIBMAUS2VERSION}-build
+	cd libmaus2-${LIBMAUS2VERSION}-build
+	../libmaus2-${LIBMAUS2VERSION}-src/configure --prefix=${BUILDDIR}/libmaus2 --disable-compile-testprograms
+	make -j${PROC} install
+	cd ..
+	rm -fR libmaus2-${LIBMAUS2VERSION}-src libmaus2-${LIBMAUS2VERSION}-build
 fi
 
 # build samtools
-if [ ! -f samtools-1.1/samtools ] ; then
-	wget -O - http://downloads.sourceforge.net/project/samtools/samtools/1.1/samtools-1.1.tar.bz2 | tar xjf -
-	cd samtools-1.1
+if [ ! -f samtools-${SAMTOOLSVERSION}/samtools ] ; then
+	wget -O - http://downloads.sourceforge.net/project/samtools/samtools/${SAMTOOLSVERSION}/samtools-${SAMTOOLSVERSION}.tar.bz2 | tar xjf -
+	cd samtools-${SAMTOOLSVERSION}
 	make -j${PROC}
 	cd ..
 fi
 
 # compute fa index
 if [ ! -f GRCH38.fa.fai ] ; then
-	samtools-1.1/samtools faidx GRCH38.fa
+	samtools-${SAMTOOLSVERSION}/samtools faidx GRCH38.fa
 fi
 
-# build biobambam
-if [ ! -f biobambam/bin/bamtofastq ] ; then
-	wget -O - https://github.com/gt1/biobambam/archive/${BIOBAMBAMVERSION}.tar.gz | tar xzf -
-	mv biobambam-${BIOBAMBAMVERSION} biobambam-${BIOBAMBAMVERSION}-src
-	mkdir -p biobambam-${BIOBAMBAMVERSION}-build
-	cd biobambam-${BIOBAMBAMVERSION}-build
-	../biobambam-${BIOBAMBAMVERSION}-src/configure --with-libmaus=${BUILDDIR}/libmaus --prefix=${BUILDDIR}/biobambam --enable-install-experimental
+# build biobambam2
+if [ ! -f biobambam2/bin/bamtofastq ] ; then
+	wget -O - https://github.com/gt1/biobambam2/archive/${BIOBAMBAM2VERSION}.tar.gz | tar xzf -
+	mv biobambam2-${BIOBAMBAM2VERSION} biobambam2-${BIOBAMBAM2VERSION}-src
+	mkdir -p biobambam2-${BIOBAMBAM2VERSION}-build
+	cd biobambam2-${BIOBAMBAM2VERSION}-build
+	../biobambam2-${BIOBAMBAM2VERSION}-src/configure --with-libmaus2=${BUILDDIR}/libmaus2 --prefix=${BUILDDIR}/biobambam2 --enable-install-experimental
 	make -j${PROC} install
 	cd ..
-	rm -fR biobambam-${BIOBAMBAMVERSION}-build biobambam-${BIOBAMBAMVERSION}-src
+	rm -fR biobambam2-${BIOBAMBAM2VERSION}-build biobambam2-${BIOBAMBAM2VERSION}-src
 fi
 
 # build bwtb3m
@@ -67,7 +87,7 @@ if [ ! -f bwtb3m/bin/bwtb3m ] ; then
 	mv bwtb3m-${BWTB3MVERSION} bwtb3m-${BWTB3MVERSION}-src
 	mkdir -p bwtb3m-${BWTB3MVERSION}-build
 	cd bwtb3m-${BWTB3MVERSION}-build
-	../bwtb3m-${BWTB3MVERSION}-src/configure --with-libmaus=${BUILDDIR}/libmaus --prefix=${BUILDDIR}/bwtb3m
+	../bwtb3m-${BWTB3MVERSION}-src/configure --with-libmaus2=${BUILDDIR}/libmaus2 --prefix=${BUILDDIR}/bwtb3m
 	make -j${PROC} install
 	cd ..
 	rm -fR bwtb3m-${BWTB3MVERSION}-build bwtb3m-${BWTB3MVERSION}-src
@@ -77,7 +97,7 @@ BWTB3MTOBWA=${BUILDDIR}/bwtb3m/bin/bwtb3mtobwa
 
 # build bwa
 if [ ! -f bwa-${BWAVERSION}/bwa ] ; then
-	wget -O - https://github.com/lh3/bwa/archive/0.7.10.tar.gz | tar xzf -
+	wget -O - https://github.com/lh3/bwa/releases/download/v${BWAVERSION}/bwa-${BWAVERSION}.tar.bz2 | tar xjf -
 	cd bwa-${BWAVERSION}
 	make -j${PROC}
 	cd ..
@@ -93,6 +113,7 @@ if [ ! -f GRCH38.fa.bwt ] ; then
 	rm -f GRCH38.fa.pac.*
 	"${BWA}" fa2pac -f "GRCH38.fa"
 fi
+
 
 # source of program for extracting reference regions from FastA
 function extractProgram
@@ -116,28 +137,28 @@ cat <<EOF
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include <libmaus/aio/CheckedInputStream.hpp>
-#include <libmaus/bambam/BamAlignmentDecoderFactory.hpp>
-#include <libmaus/fastx/FastAIndex.hpp>
-#include <libmaus/util/ArgInfo.hpp>
+#include <libmaus2/aio/InputStreamInstance.hpp>
+#include <libmaus2/bambam/BamAlignmentDecoderFactory.hpp>
+#include <libmaus2/fastx/FastAIndex.hpp>
+#include <libmaus2/util/ArgInfo.hpp>
 
 int main(int argc, char * argv[])
 {
 	try
 	{
-		libmaus::util::ArgInfo const arginfo(argc,argv);
+		libmaus2::util::ArgInfo const arginfo(argc,argv);
 		std::string const fafn = arginfo.restargs.at(0);
 		std::string const faidxfn = fafn + ".fai";
 		std::string const srange = arginfo.restargs.at(1);
-		libmaus::bambam::CramRange range(srange);
-		libmaus::aio::CheckedInputStream idxCIS(faidxfn);
-		libmaus::fastx::FastAIndex faidx(idxCIS);
-		idxCIS.close();
+		libmaus2::bambam::CramRange range(srange);
+		libmaus2::aio::InputStreamInstance idxCIS(faidxfn);
+		libmaus2::fastx::FastAIndex faidx(idxCIS);
+		// idxCIS.close();
 
 		std::map<std::string,uint64_t> seqtoid;
 		for ( uint64_t i = 0; i < faidx.sequences.size(); ++i )
 		{
-			libmaus::fastx::FastAIndexEntry const & ie = faidx.sequences[i];
+			libmaus2::fastx::FastAIndexEntry const & ie = faidx.sequences[i];
 			std::string const & seqname = ie.name;
 			seqtoid[seqname] = i;
 		}
@@ -146,14 +167,14 @@ int main(int argc, char * argv[])
 		
 		if ( seqtoid.find(rangeseq) == seqtoid.end() )
 		{
-			libmaus::exception::LibMausException lme;
+			libmaus2::exception::LibMausException lme;
 			lme.getStream() << "Cannot find sequence " << rangeseq << std::endl;
 			lme.finish();
 			throw lme;
 		}
 
-		libmaus::aio::CheckedInputStream faistr(fafn);
-		libmaus::autoarray::AutoArray<char> const seq = faidx.readSequence(faistr, seqtoid.find(rangeseq)->second);
+		libmaus2::aio::InputStreamInstance faistr(fafn);
+		libmaus2::autoarray::AutoArray<char> const seq = faidx.readSequence(faistr, seqtoid.find(rangeseq)->second);
 		
 		int64_t const zstart = static_cast<int64_t>(range.rangestart)-1;
 		int64_t const zend = static_cast<int64_t>(range.rangeend)-1;
@@ -161,7 +182,7 @@ int main(int argc, char * argv[])
 
 		if ( zlen < 0 || zstart < 0 || zend >= seq.size() )
 		{
-			libmaus::exception::LibMausException lme;
+			libmaus2::exception::LibMausException lme;
 			lme.getStream() << "Invalid input range" << std::endl;
 			lme.finish();
 			throw lme;
@@ -175,7 +196,7 @@ int main(int argc, char * argv[])
 		// std::cerr << "rangeseq=" << rangeseq << " rangestart=" << range.rangestart << " rangeend=" << range.rangeend << std::endl;
 
 		// rangestart,rangestart
-		// libmaus::autoarray::AutoArray<char> readSequence(std::istream & in, int64_t const seqid)
+		// libmaus2::autoarray::AutoArray<char> readSequence(std::istream & in, int64_t const seqid)
 	}
 	catch(std::exception const & ex)
 	{
@@ -189,7 +210,8 @@ EOF
 # build program for extracting reference regions
 if [ ! -f faextract ] ; then
 	extractProgram > faextract.cpp
-	c++ -std=c++0x -Ilibmaus/include -Llibmaus/lib faextract.cpp -ofaextract -lmaus -Wl,-rpath=${BUILDDIR}/libmaus/lib
+	FALIBS=`PKG_CONFIG_PATH=${BUILDDIR}/libmaus2/lib/pkgconfig ${BUILDDIR}/tools/bin/pkg-config --libs libmaus2`
+	c++ -std=c++0x -Ilibmaus2/include -Llibmaus2/lib faextract.cpp -ofaextract -lmaus2 -Wl,-rpath=${BUILDDIR}/libmaus2/lib ${FALIBS}
 	rm -f faextract.cpp
 fi
 
@@ -305,7 +327,7 @@ CRANGE=`zcat refFlat.txt.gz | awk -v GENE=BRCA1 '{ if ( match($0,GENE "\t") ) pr
 # the reads are mapped to the human reference using BWA mem
 # the resulting SAM files is sorted by coordinate and converted to BAM
 if [ ! -f ${GENE}mod.bam ] ; then
-	genemod | bwa-0.7.10/bwa mem -p GRCH38.fa - | biobambam/bin/bamsort inputformat=sam > ${GENE}mod.bam
+	genemod | bwa-${BWAVERSION}/bwa mem -p GRCH38.fa - | biobambam2/bin/bamsort inputformat=sam > ${GENE}mod.bam
 fi
 
 INPUT=${GENE}mod.bam
@@ -325,22 +347,22 @@ if [ ! -f ${FILTERED} ] ; then
 		# convert BAM to FastQ, modify names to hide pair information fro BWA,
 		# map reads as single end
 		# sort by coordinate
-		biobambam/bin/bamtofastq O=/dev/null O2=/dev/null S=/dev/null < ${INPUT} | \
+		biobambam2/bin/bamtofastq O=/dev/null O2=/dev/null S=/dev/null < ${INPUT} | \
 			awk 'NR%4==1 {sub(/\/1$/,"_one",$0) ; sub(/\/2$/,"_two",$0) ; print} NR%4!=1 {print}' |\
 			${BWA} mem -t ${PROC} GRCH38.fa - | \
-			biobambam/bin/bamsort index=1 indexfilename=${REMAPPED}.bai inputformat=sam calmdnm=1 fixmates=1 calmdnmreference=GRCH37.fa sortthreads=${PROC} >${REMAPPED}
+			biobambam2/bin/bamsort index=1 indexfilename=${REMAPPED}.bai inputformat=sam calmdnm=1 fixmates=1 calmdnmreference=GRCH37.fa sortthreads=${PROC} >${REMAPPED}
 	fi
 
 	# extract range around target and save names where at least one end map to the target region
-	biobambam/bin/bamcollate2 ranges="${RANGE}" I=${REMAPPED} | samtools-1.1/samtools view -h - | awk -F '\t' '!/@/{sub(/_one|_two/,"",$1) ; print $1}' | sort -u > ${NAMES}
+	biobambam2/bin/bamcollate2 ranges="${RANGE}" I=${REMAPPED} | samtools-${SAMTOOLSVERSION}/samtools view -h - | awk -F '\t' '!/@/{sub(/_one|_two/,"",$1) ; print $1}' | sort -u > ${NAMES}
 	# filter reads with matching names from BAM file
-	biobambam/bin/bamfilternames <${INPUT} names=${NAMES} outputthreads=${PROC} >${FILTERED}
+	biobambam2/bin/bamfilternames <${INPUT} names=${NAMES} outputthreads=${PROC} >${FILTERED}
 	rm -f ${NAMES} ${REMAPPED} ${REMAPPED}.bai
 fi
 
 if [ ! -f ${FILTERED}.fa.gz ] ; then
 	# extract reads as FastA
-	biobambam/bin/bamtofastq < "${FILTERED}" fasta=1 O=/dev/null O2=/dev/null S=/dev/null | gzip -9 > ${FILTERED%.bam}.fa.gz
+	biobambam2/bin/bamtofastq < "${FILTERED}" fasta=1 O=/dev/null O2=/dev/null S=/dev/null | gzip -9 > ${FILTERED%.bam}.fa.gz
 fi
 
 if [ ! -f ${FILTERED%.bam}.compact ] ; then
@@ -359,7 +381,7 @@ if [ ! -f alternatives/bin/alternatives ] ; then
 	mv alternatives-${ALTERNATIVESVERSION} alternatives-${ALTERNATIVESVERSION}-src
 	mkdir -p alternatives-${ALTERNATIVESVERSION}-build
 	cd alternatives-${ALTERNATIVESVERSION}-build
-	../alternatives-${ALTERNATIVESVERSION}-src/configure --with-libmaus=${BUILDDIR}/libmaus --prefix=${BUILDDIR}/alternatives
+	../alternatives-${ALTERNATIVESVERSION}-src/configure --with-libmaus2=${BUILDDIR}/libmaus2 --prefix=${BUILDDIR}/alternatives
 	make -j${PROC} install
 	cd ..
 	rm -fR alternatives-${ALTERNATIVESVERSION}-src alternatives-${ALTERNATIVESVERSION}-build
@@ -401,6 +423,6 @@ for i in ${FILTERED%.bam}_bubbles_multi_indel*.fasta ; do
 	fi
 	# align contigs to reference using bwa mem
 	if [ ! -f ${i%.fasta}.bam ] ; then
-		bwa-0.7.10/bwa mem GRCH38.fa $i | biobambam/bin/bamsort inputformat=sam > ${i%.fasta}.bam
+		bwa-${BWAVERSION}/bwa mem GRCH38.fa $i | biobambam2/bin/bamsort inputformat=sam > ${i%.fasta}.bam
 	fi
 done
