@@ -18,14 +18,14 @@
 */
 #include <config.h>
 
-#include <libmaus/alignment/SimpleLocalAligner.hpp>
-#include <libmaus/util/OutputFileNameTools.hpp>
-#include <libmaus/lcs/HammingOverlapDetection.hpp>
-#include <libmaus/parallel/PosixSpinLock.hpp>
-#include <libmaus/util/NumberSerialisation.hpp>
-#include <libmaus/graph/StronglyConnectedComponents.hpp>
-#include <libmaus/graph/TopologicalSorting.hpp>
-#include <libmaus/graph/IdentityTargetProjector.hpp>
+#include <libmaus2/alignment/SimpleLocalAligner.hpp>
+#include <libmaus2/util/OutputFileNameTools.hpp>
+#include <libmaus2/lcs/HammingOverlapDetection.hpp>
+#include <libmaus2/parallel/PosixSpinLock.hpp>
+#include <libmaus2/util/NumberSerialisation.hpp>
+#include <libmaus2/graph/StronglyConnectedComponents.hpp>
+#include <libmaus2/graph/TopologicalSorting.hpp>
+#include <libmaus2/graph/IdentityTargetProjector.hpp>
 
 #if defined(_OPENMP)
 #include <omp.h>
@@ -63,20 +63,20 @@ static uint64_t getSeqLen(std::vector<uint64_t> const & seqstarts, uint64_t cons
 // read container
 struct ReadContainer
 {
-	typedef libmaus::fm::BidirectionalDnaIndexImpCompactHuffmanWaveletTree index_type;
+	typedef libmaus2::fm::BidirectionalDnaIndexImpCompactHuffmanWaveletTree index_type;
 	typedef index_type::lf_type lf_type;
 	index_type const & index;
-	libmaus::fm::SampledISA<lf_type> const & ISA;
+	libmaus2::fm::SampledISA<lf_type> const & ISA;
 	std::vector<uint64_t> const seqstart;
-	
+
 	ReadContainer(
 		index_type const & rindex,
-		libmaus::fm::SampledISA<lf_type> const & rISA
+		libmaus2::fm::SampledISA<lf_type> const & rISA
 	) : index(rindex), ISA(rISA), seqstart(index.getSeqStartPositions())
 	{
-	
+
 	}
-	
+
 	// get read for id
 	std::string getRead(uint64_t const readid) const
 	{
@@ -90,66 +90,66 @@ struct ReadContainer
 
 // return true if edge orientations represent an a b c type overlap
 static bool isABCOverlap(
-        ::libmaus::lcs::OverlapOrientation::overlap_orientation const abo,
-        ::libmaus::lcs::OverlapOrientation::overlap_orientation const aco,
-        ::libmaus::lcs::OverlapOrientation::overlap_orientation const bco
+        ::libmaus2::lcs::OverlapOrientation::overlap_orientation const abo,
+        ::libmaus2::lcs::OverlapOrientation::overlap_orientation const aco,
+        ::libmaus2::lcs::OverlapOrientation::overlap_orientation const bco
         )
 {
 	return (
                 // abc
                 (
-                        abo==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back  && // ab
-                        aco==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back  && // ac
-                        bco==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back     // bc
+                        abo==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back  && // ab
+                        aco==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back  && // ac
+                        bco==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back     // bc
                 )
                 // Abc
                 ||
                 (
-                        abo==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back && // Ab
-                        aco==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back && // Ac
-                        bco==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back     // bc
+                        abo==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back && // Ab
+                        aco==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back && // Ac
+                        bco==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back     // bc
                 )
                 // aBc
                 ||
                 (
-                        abo==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front && // aB
-                        aco==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back  && // ac
-                        bco==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back    // Bc
+                        abo==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front && // aB
+                        aco==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back  && // ac
+                        bco==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back    // Bc
                 )
                 // ABc
                 ||
                 (
-                        abo==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front  && // AB
-                        aco==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back && // Ac
-                        bco==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back    // Bc
+                        abo==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front  && // AB
+                        aco==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back && // Ac
+                        bco==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back    // Bc
                 )
                 // abC
                 ||
                 (
-                        abo==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back  && // ab
-                        aco==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front && // aC
-                        bco==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front    // bC
+                        abo==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back  && // ab
+                        aco==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front && // aC
+                        bco==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front    // bC
                 )
                 // AbC
                 ||
                 (
-                        abo==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back && // Ab
-                        aco==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front  && // AC
-                        bco==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front    // bC
+                        abo==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back && // Ab
+                        aco==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front  && // AC
+                        bco==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front    // bC
                 )
                 // aBC
                 ||
                 (
-                        abo==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front && // aB
-                        aco==libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front && // aC
-                        bco==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front     // BC
+                        abo==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front && // aB
+                        aco==libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front && // aC
+                        bco==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front     // BC
                 )
                 // ABC
                 ||
                 (
-                        abo==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front  && // AB
-                        aco==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front  && // AC
-                        bco==libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front     // BC
+                        abo==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front  && // AB
+                        aco==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front  && // AC
+                        bco==libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front     // BC
                 )
         );
 }
@@ -158,7 +158,7 @@ static bool isABCOverlap(
 struct OverlapEntry
 {
 	// overlap type
-	libmaus::lcs::OverlapOrientation::overlap_orientation orientation;
+	libmaus2::lcs::OverlapOrientation::overlap_orientation orientation;
 	// b overhang behind overlap of a and b
 	uint64_t overhang;
 	// score of match between a and b
@@ -167,38 +167,38 @@ struct OverlapEntry
 	uint64_t overlap;
 	// edge target
 	uint64_t target;
-	
+
 	OverlapEntry()
 	{
 	}
-	
+
 	OverlapEntry(
-		libmaus::lcs::OverlapOrientation::overlap_orientation rorientation,
+		libmaus2::lcs::OverlapOrientation::overlap_orientation rorientation,
 		uint64_t roverhang,
 		int64_t rscore,
 		uint64_t roverlap,
 		uint64_t rtarget
 	) : orientation(rorientation), overhang(roverhang), score(rscore), overlap(roverlap), target(rtarget) {}
 
-	libmaus::lcs::OverlapOrientation::overlap_orientation decodeOverlapOrientation(uint64_t const v)
+	libmaus2::lcs::OverlapOrientation::overlap_orientation decodeOverlapOrientation(uint64_t const v)
 	{
 		switch ( v )
 		{
-			case libmaus::lcs::OverlapOrientation::overlap_cover_complete: return libmaus::lcs::OverlapOrientation::overlap_cover_complete;
-			case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front: return libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front;
-			case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back: return libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back;
-			case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front: return libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front;
-			case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back: return libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back;
-			case libmaus::lcs::OverlapOrientation::overlap_a_covers_b:    return libmaus::lcs::OverlapOrientation::overlap_a_covers_b;
-			case libmaus::lcs::OverlapOrientation::overlap_b_covers_a:    return libmaus::lcs::OverlapOrientation::overlap_b_covers_a;
-			case libmaus::lcs::OverlapOrientation::overlap_ar_covers_b:   return libmaus::lcs::OverlapOrientation::overlap_ar_covers_b;
-			case libmaus::lcs::OverlapOrientation::overlap_b_covers_ar:   return libmaus::lcs::OverlapOrientation::overlap_b_covers_ar;
-			case libmaus::lcs::OverlapOrientation::overlap_a_complete_b:  return libmaus::lcs::OverlapOrientation::overlap_a_complete_b;
-			case libmaus::lcs::OverlapOrientation::overlap_ar_complete_b: return libmaus::lcs::OverlapOrientation::overlap_ar_complete_b;
+			case libmaus2::lcs::OverlapOrientation::overlap_cover_complete: return libmaus2::lcs::OverlapOrientation::overlap_cover_complete;
+			case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front: return libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front;
+			case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back: return libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back;
+			case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front: return libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front;
+			case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back: return libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back;
+			case libmaus2::lcs::OverlapOrientation::overlap_a_covers_b:    return libmaus2::lcs::OverlapOrientation::overlap_a_covers_b;
+			case libmaus2::lcs::OverlapOrientation::overlap_b_covers_a:    return libmaus2::lcs::OverlapOrientation::overlap_b_covers_a;
+			case libmaus2::lcs::OverlapOrientation::overlap_ar_covers_b:   return libmaus2::lcs::OverlapOrientation::overlap_ar_covers_b;
+			case libmaus2::lcs::OverlapOrientation::overlap_b_covers_ar:   return libmaus2::lcs::OverlapOrientation::overlap_b_covers_ar;
+			case libmaus2::lcs::OverlapOrientation::overlap_a_complete_b:  return libmaus2::lcs::OverlapOrientation::overlap_a_complete_b;
+			case libmaus2::lcs::OverlapOrientation::overlap_ar_complete_b: return libmaus2::lcs::OverlapOrientation::overlap_ar_complete_b;
 			default:
 			{
-				libmaus::exception::LibMausException lme;
-				lme.getStream() << "cannot decode " << v << " as libmaus::lcs::OverlapOrientation::overlap_orientation" << std::endl;
+				libmaus2::exception::LibMausException lme;
+				lme.getStream() << "cannot decode " << v << " as libmaus2::lcs::OverlapOrientation::overlap_orientation" << std::endl;
 				lme.finish();
 				throw lme;
 			}
@@ -207,19 +207,19 @@ struct OverlapEntry
 
 	void serialise(std::ostream & out) const
 	{
-		libmaus::util::NumberSerialisation::serialiseNumber(out,static_cast<uint64_t>(orientation));
-		libmaus::util::NumberSerialisation::serialiseNumber(out,static_cast<uint64_t>(overhang));
-		libmaus::util::NumberSerialisation::serialiseSignedNumber(out,static_cast<uint64_t>(score));
-		libmaus::util::NumberSerialisation::serialiseNumber(out,static_cast<uint64_t>(overlap));
-		libmaus::util::NumberSerialisation::serialiseNumber(out,static_cast<uint64_t>(target));
+		libmaus2::util::NumberSerialisation::serialiseNumber(out,static_cast<uint64_t>(orientation));
+		libmaus2::util::NumberSerialisation::serialiseNumber(out,static_cast<uint64_t>(overhang));
+		libmaus2::util::NumberSerialisation::serialiseSignedNumber(out,static_cast<uint64_t>(score));
+		libmaus2::util::NumberSerialisation::serialiseNumber(out,static_cast<uint64_t>(overlap));
+		libmaus2::util::NumberSerialisation::serialiseNumber(out,static_cast<uint64_t>(target));
 	}
 	OverlapEntry(std::istream & in)
 	:
-		orientation(decodeOverlapOrientation(libmaus::util::NumberSerialisation::deserialiseNumber(in))),
-		overhang(libmaus::util::NumberSerialisation::deserialiseNumber(in)),
-		score(libmaus::util::NumberSerialisation::deserialiseSignedNumber(in)),
-		overlap(libmaus::util::NumberSerialisation::deserialiseNumber(in)),
-		target(libmaus::util::NumberSerialisation::deserialiseNumber(in))
+		orientation(decodeOverlapOrientation(libmaus2::util::NumberSerialisation::deserialiseNumber(in))),
+		overhang(libmaus2::util::NumberSerialisation::deserialiseNumber(in)),
+		score(libmaus2::util::NumberSerialisation::deserialiseSignedNumber(in)),
+		overlap(libmaus2::util::NumberSerialisation::deserialiseNumber(in)),
+		target(libmaus2::util::NumberSerialisation::deserialiseNumber(in))
 	{}
 };
 
@@ -244,7 +244,7 @@ struct OverlapEntryOverlapComparator
 // output operator for OverlapEntry
 std::ostream & operator<<(std::ostream & out, OverlapEntry const & oe)
 {
-	return out << "OverlapEntry(" 
+	return out << "OverlapEntry("
 		<< oe.orientation << ","
 		<< "overhang=" << oe.overhang << ","
 		<< "score=" << oe.score << ","
@@ -256,29 +256,29 @@ std::ostream & operator<<(std::ostream & out, OverlapEntry const & oe)
 void loadEdges(std::map< uint64_t,std::vector<OverlapEntry> > & preedges, std::set<uint64_t> & dup, std::string const & primedgesname)
 {
 	std::cerr << "loading serialised edges...";
-	libmaus::aio::CheckedInputStream CIS(primedgesname);
-	
+	libmaus2::aio::InputStreamInstance CIS(primedgesname);
+
 	// number of source vertices
-	uint64_t const numentries = libmaus::util::NumberSerialisation::deserialiseNumber(CIS);
-	
+	uint64_t const numentries = libmaus2::util::NumberSerialisation::deserialiseNumber(CIS);
+
 	for ( uint64_t i = 0; i < numentries; ++i )
 	{
 		// source vertex index
-		uint64_t const s = libmaus::util::NumberSerialisation::deserialiseNumber(CIS);
+		uint64_t const s = libmaus2::util::NumberSerialisation::deserialiseNumber(CIS);
 		// number of edges for s
-		uint64_t const n = libmaus::util::NumberSerialisation::deserialiseNumber(CIS);
-		
+		uint64_t const n = libmaus2::util::NumberSerialisation::deserialiseNumber(CIS);
+
 		for ( uint64_t j = 0; j < n; ++j )
 		{
 			OverlapEntry OE(CIS);
 			preedges[s].push_back(OE);
 		}
 	}
-	
+
 	// number of dup vertices
-	uint64_t const numdup = libmaus::util::NumberSerialisation::deserialiseNumber(CIS);
+	uint64_t const numdup = libmaus2::util::NumberSerialisation::deserialiseNumber(CIS);
 	for ( uint64_t i = 0; i < numdup; ++i )
-		dup.insert(libmaus::util::NumberSerialisation::deserialiseNumber(CIS));
+		dup.insert(libmaus2::util::NumberSerialisation::deserialiseNumber(CIS));
 
 	std::cerr << "done." << std::endl;
 }
@@ -287,18 +287,18 @@ void loadEdges(std::map< uint64_t,std::vector<OverlapEntry> > & preedges, std::s
 void saveEdges(std::map< uint64_t,std::vector<OverlapEntry> > const & preedges, std::set<uint64_t> const & dup, std::string const & primedgesname)
 {
 	std::cerr << "serialising edges...";
-	libmaus::aio::CheckedOutputStream COS(primedgesname);
-	libmaus::util::NumberSerialisation::serialiseNumber(COS,preedges.size());
+	libmaus2::aio::OutputStreamInstance COS(primedgesname);
+	libmaus2::util::NumberSerialisation::serialiseNumber(COS,preedges.size());
 	for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 	{
-		libmaus::util::NumberSerialisation::serialiseNumber(COS,ita->first);
-		libmaus::util::NumberSerialisation::serialiseNumber(COS,ita->second.size());
+		libmaus2::util::NumberSerialisation::serialiseNumber(COS,ita->first);
+		libmaus2::util::NumberSerialisation::serialiseNumber(COS,ita->second.size());
 		for ( uint64_t i = 0; i < ita->second.size(); ++i )
 			ita->second[i].serialise(COS);
 	}
-	libmaus::util::NumberSerialisation::serialiseNumber(COS,dup.size());
+	libmaus2::util::NumberSerialisation::serialiseNumber(COS,dup.size());
 	for ( std::set<uint64_t>::const_iterator ita = dup.begin(); ita != dup.end(); ++ita )
-		libmaus::util::NumberSerialisation::serialiseNumber(COS,*ita);
+		libmaus2::util::NumberSerialisation::serialiseNumber(COS,*ita);
 	std::cerr << "done." << std::endl;
 }
 
@@ -307,20 +307,20 @@ struct Pileup
 {
 	// piles
 	std::map< uint64_t,std::vector<char> > M;
-	
+
 	// add symbol c in column i
 	void add(uint64_t const i, char const c)
 	{
 		M[i].push_back(c);
 	}
-	
+
 	// add string s starting from column i
 	void add(uint64_t const i, std::string const & s)
 	{
 		for ( uint64_t j = 0; j < s.size(); ++j )
 			add(i+j,s[j]);
 	}
-	
+
 	// get consensus for column i and erase column i
 	std::pair<char,uint64_t> consensus(uint64_t const i)
 	{
@@ -333,13 +333,13 @@ struct Pileup
 			std::vector<char> const & V = M.find(i)->second;
 			for ( uint64_t j = 0; j < V.size(); ++j )
 				C[V[j]]++;
-			
+
 			std::vector < std::pair<uint64_t,char> > VV;
 			for ( std::map<char,uint64_t>::const_iterator ita = C.begin(); ita != C.end(); ++ita )
 			{
 				VV.push_back(std::pair<uint64_t,char>(ita->second,ita->first));
-				
-				if ( 
+
+				if (
 					ita->first == 'a' ||
 					ita->first == 'A' ||
 					ita->first == 'c' ||
@@ -347,12 +347,12 @@ struct Pileup
 					ita->first == 'g' ||
 					ita->first == 'G' ||
 					ita->first == 't' ||
-					ita->first == 'T' 
+					ita->first == 'T'
 				)
 					support += ita->second;
 			}
 			std::sort(VV.begin(),VV.end());
-							
+
 			if ( VV.size() == 1 )
 				cons = VV[0].second;
 			else
@@ -362,10 +362,10 @@ struct Pileup
 				else
 					cons = VV[VV.size()-1].second;
 			}
-			
+
 			M.erase(M.find(i));
 		}
-		
+
 		return std::pair<char,uint64_t>(cons,support);
 	}
 };
@@ -396,21 +396,21 @@ struct EdgeSet : public CurEndBase
 
 	EdgeSet(std::map< uint64_t,std::vector<OverlapEntry> > & rpreedges) : preedges(rpreedges) {}
 
-	// print set of edges	
+	// print set of edges
 	std::ostream & printEdges(std::ostream & out) const
 	{
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 		{
 			std::vector<OverlapEntry> const & V = ita->second;
-			
+
 			for ( uint64_t i = 0; i < V.size(); ++i )
 				out << std::setw(6) << ita->first << std::setw(0) << " -> " << V[i] << "\n";
 		}
-		
+
 		return out;
 	}
-	
-	
+
+
 	static cur_end_type decodeCurEndType(uint64_t const i)
 	{
 		switch ( i )
@@ -421,14 +421,14 @@ struct EdgeSet : public CurEndBase
 				return cur_end_right;
 			default:
 			{
-				libmaus::exception::LibMausException lme;
+				libmaus2::exception::LibMausException lme;
 				lme.getStream() << "Unknown value in decodeCurEndType\n";
 				lme.finish();
 				throw lme;
 			}
 		}
 	}
-	
+
 	// null vertex container
 	struct NullContainer
 	{
@@ -439,9 +439,9 @@ struct EdgeSet : public CurEndBase
 	struct DequeFrontContainer
 	{
 		std::deque<uint64_t> & D;
-		
+
 		DequeFrontContainer(std::deque<uint64_t> & rD) : D(rD) {}
-		
+
 		void operator()(uint64_t const v)
 		{
 			D.push_front(v);
@@ -452,9 +452,9 @@ struct EdgeSet : public CurEndBase
 	struct DequeBackContainer
 	{
 		std::deque<uint64_t> & D;
-		
+
 		DequeBackContainer(std::deque<uint64_t> & rD) : D(rD) {}
-		
+
 		void operator()(uint64_t const v)
 		{
 			D.push_back(v);
@@ -470,7 +470,7 @@ struct EdgeSet : public CurEndBase
 		uint64_t c;
 		// current end were path could not be continued
 		cur_end_type cur_end;
-		
+
 		FollowUniqueResult() : v(0), c(0), cur_end(cur_end_left) {}
 		FollowUniqueResult(
 			uint64_t const rv,
@@ -479,17 +479,17 @@ struct EdgeSet : public CurEndBase
 		)
 		: v(rv), c(rc), cur_end(rcur_end)
 		{
-		
+
 		}
 	};
-	
+
 	// returns true if OE is a left edge (outgoing edge is from front of read)
 	static bool isLeftEdge(OverlapEntry const & OE)
 	{
 		return
-			OE.orientation == libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front
+			OE.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front
 			||
-			OE.orientation == libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back;
+			OE.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back;
 	}
 
 	// get set of edges pointing into v by using edges leaving v and looking back at v from the target vertices
@@ -504,21 +504,21 @@ struct EdgeSet : public CurEndBase
 			for ( uint64_t i = 0; i < V.size(); ++i )
 				S.insert(V[i].target);
 		}
-		
+
 		for ( std::set<uint64_t>::const_iterator ita = S.begin(); ita != S.end(); ++ita )
 		{
 			uint64_t const rv = *ita;
-			
+
 			if ( preedges.find(rv) != preedges.end() )
 			{
 				std::vector<OverlapEntry> const & RV = preedges.find(rv)->second;
-				
+
 				for ( uint64_t i = 0; i < RV.size(); ++i )
 					if ( RV[i].target == v )
 						V.push_back(std::pair<uint64_t,OverlapEntry>(rv, RV[i]));
 			}
 		}
-		
+
 		return V;
 	}
 
@@ -526,23 +526,23 @@ struct EdgeSet : public CurEndBase
 	static bool isRightEdge(OverlapEntry const & OE)
 	{
 		return
-			OE.orientation == libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front
+			OE.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front
 			||
-			OE.orientation == libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back;
+			OE.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back;
 	}
-	
+
 	// returns true if i is a border vertex (has edges either only and the left or only on the right)
 	bool isBorderVertex(uint64_t const i) const
 	{
 		if  ( preedges.find(i) == preedges.end() )
 			return false;
-		
+
 		return
 			(countLeftEdges(i) == 0 && countRightEdges(i) != 0)
 			||
 			(countLeftEdges(i) != 0 && countRightEdges(i) == 0);
 	}
-	
+
 	// count number of left edges in vector V
 	static uint64_t countLeftEdges(std::vector<OverlapEntry> const & V)
 	{
@@ -550,7 +550,7 @@ struct EdgeSet : public CurEndBase
 		for ( uint64_t i = 0; i < V.size(); ++i )
 			if ( isLeftEdge(V[i]) )
 				++c;
-				
+
 		return c;
 	}
 
@@ -561,7 +561,7 @@ struct EdgeSet : public CurEndBase
 		for ( uint64_t i = 0; i < V.size(); ++i )
 			if ( isRightEdge(V[i]) )
 				++c;
-				
+
 		return c;
 	}
 
@@ -569,32 +569,32 @@ struct EdgeSet : public CurEndBase
 	bool checkSymmetry() const
 	{
 		bool ok = true;
-		
+
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 		{
 			uint64_t const s = ita->first;
 			std::vector<OverlapEntry> const & T = ita->second;
-			
+
 			for ( uint64_t i = 0; i < T.size(); ++i )
 			{
 				OverlapEntry const t = T[i];
 				bool const okf = hasEdge(s,t.target);
 				bool const okr = hasReverseEdge(s,t.target);
-				
+
 				assert ( okf );
-				
+
 				if ( ! okr )
 				{
 					std::cerr << "reverse edge for " << s << " -> " << getEdge(s,t.target) << " is missing" << std::endl;
-				}				
-				
+				}
+
 				ok = ok && okf && okr;
 			}
 		}
-		
+
 		return ok;
 	}
-	
+
 	/**
 	 * return true if graph contains the reverse edge for (s,t) or if (s,t) does not exist
 	 **/
@@ -602,7 +602,7 @@ struct EdgeSet : public CurEndBase
 	{
 		bool const have_s_t = hasEdge(s,t);
 		bool const have_t_s = hasEdge(t,s);
-		
+
 		if ( have_s_t != have_t_s )
 			return false;
 		else if ( !have_s_t )
@@ -611,31 +611,31 @@ struct EdgeSet : public CurEndBase
 		{
 			OverlapEntry const forward = getEdge(s,t);
 			OverlapEntry const reverse = getEdge(t,s);
-			
+
 			switch ( forward.orientation )
 			{
-				case libmaus::lcs::OverlapOrientation::overlap_cover_complete:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_cover_complete;
-				case libmaus::lcs::OverlapOrientation::overlap_a_covers_b:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_b_covers_a;
-				case libmaus::lcs::OverlapOrientation::overlap_b_covers_a:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_a_covers_b;
-				case libmaus::lcs::OverlapOrientation::overlap_ar_covers_b:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_b_covers_ar;
-				case libmaus::lcs::OverlapOrientation::overlap_b_covers_ar:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_ar_covers_b;
-				case libmaus::lcs::OverlapOrientation::overlap_a_complete_b:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_a_complete_b;
-				case libmaus::lcs::OverlapOrientation::overlap_ar_complete_b:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_ar_complete_b;
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back;
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back;
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front;
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-					return reverse.orientation == libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front;
+				case libmaus2::lcs::OverlapOrientation::overlap_cover_complete:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_cover_complete;
+				case libmaus2::lcs::OverlapOrientation::overlap_a_covers_b:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_b_covers_a;
+				case libmaus2::lcs::OverlapOrientation::overlap_b_covers_a:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_covers_b;
+				case libmaus2::lcs::OverlapOrientation::overlap_ar_covers_b:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_b_covers_ar;
+				case libmaus2::lcs::OverlapOrientation::overlap_b_covers_ar:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_ar_covers_b;
+				case libmaus2::lcs::OverlapOrientation::overlap_a_complete_b:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_complete_b;
+				case libmaus2::lcs::OverlapOrientation::overlap_ar_complete_b:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_ar_complete_b;
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back;
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back;
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front;
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+					return reverse.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front;
 				default:
 					return false;
 			}
@@ -669,14 +669,14 @@ struct EdgeSet : public CurEndBase
 			&&
 			(
 				(
-					FUR.cur_end == cur_end_left 
+					FUR.cur_end == cur_end_left
 					&&
 					countLeftEdges(FUR.v) == 1
 					&&
 					hasReverseEdge(FUR.v,getFirstLeftEdge(FUR.v).target)
-					
+
 					&&
-					
+
 					(
 						(
 						isLeftEdge(getEdge(getFirstLeftEdge(FUR.v).target,FUR.v))
@@ -695,12 +695,12 @@ struct EdgeSet : public CurEndBase
 				(
 					FUR.cur_end == cur_end_right
 					&&
-					countRightEdges(FUR.v) == 1				
+					countRightEdges(FUR.v) == 1
 					&&
 					hasReverseEdge(FUR.v,getFirstRightEdge(FUR.v).target)
 
 					&&
-					
+
 					(
 						(
 						isLeftEdge(getEdge(getFirstRightEdge(FUR.v).target,FUR.v))
@@ -724,20 +724,20 @@ struct EdgeSet : public CurEndBase
 		else
 		{
 			return false;
-		}	
+		}
 	}
-	
+
 	// comparator projecting onto second component of a pair
 	template<typename type_a, typename type_b, template<typename> class base_comparator>
 	struct PairSecondComparator
 	{
 		base_comparator<type_b> comparator;
-		
+
 		PairSecondComparator() : comparator()
 		{
-		
+
 		}
-	
+
 		bool operator()(
 			std::pair<type_a,type_b> const & A,
 			std::pair<type_a,type_b> const & B
@@ -746,36 +746,36 @@ struct EdgeSet : public CurEndBase
 			return comparator(A.second,B.second);
 		}
 	};
-	
-	// remove (single) edge 
+
+	// remove (single) edge
 	void removeEdge(uint64_t const from, uint64_t const to)
 	{
 		if ( preedges.find(from) != preedges.end() )
 		{
 			std::vector<OverlapEntry> & edges = preedges.find(from)->second;
-			
+
 			uint64_t o = 0;
 			for ( uint64_t i = 0; i < edges.size(); ++i )
 				if ( edges[i].target != to )
 					edges[o++] = edges[i];
-					
+
 			edges.resize(o);
-			
+
 			if ( ! o )
 				preedges.erase(preedges.find(from));
 		}
 	}
-	
+
 	static uint64_t computeId(uint64_t const vertex, cur_end_type cur_end)
 	{
 		return (vertex << 1) | ((cur_end==cur_end_left) ? 0 : 1);
 	}
-	
+
 	static uint64_t computeId(std::pair<uint64_t,cur_end_type> const & P)
 	{
 		return computeId(P.first,P.second);
 	}
-	
+
 	static std::pair<uint64_t,cur_end_type> decodeId(uint64_t const vertex)
 	{
 		return std::pair<uint64_t,cur_end_type>(vertex>>1,decodeCurEndType(vertex&1));
@@ -787,23 +787,23 @@ struct EdgeSet : public CurEndBase
 	{
 		// extract edges
 		std::map< uint64_t,std::vector<uint64_t> > const subedgesshift = extractConnectedSubEdgesShift(root,rcur_end);
-		
+
 		std::pair< std::vector< uint64_t >, std::vector< uint64_t > > SCCshift =
-			libmaus::graph::StronglyConnectedComponents::strongConnectContract<uint64_t,libmaus::graph::IdentityTargetProjector>(
+			libmaus2::graph::StronglyConnectedComponents::strongConnectContract<uint64_t,libmaus2::graph::IdentityTargetProjector>(
 			subedgesshift,computeId(root,rcur_end)
 		);
-		
+
 		std::set < std::set<uint64_t> > S;
 		for ( uint64_t i = 1; i < SCCshift.second.size(); ++i )
 		{
 			std::set<uint64_t> R;
-			
+
 			for ( uint64_t j = SCCshift.second[i-1]; j < SCCshift.second[i]; ++j )
 				R.insert(SCCshift.first[j] >> 1);
-			
+
 			S.insert(R);
 		}
-		
+
 		std::vector< uint64_t > V0, V1;
 		for ( std::set < std::set<uint64_t> >::const_iterator sita = S.begin(); sita != S.end(); ++sita )
 		{
@@ -812,7 +812,7 @@ struct EdgeSet : public CurEndBase
 				V0.push_back(*ita);
 			V1.push_back(subS.size());
 		}
-		
+
 		uint64_t acc = 0;
 		for ( uint64_t i = 0; i < V1.size(); ++i )
 		{
@@ -821,7 +821,7 @@ struct EdgeSet : public CurEndBase
 			acc += t;
 		}
 		V1.push_back(acc);
-		
+
 		return std::pair< std::vector< uint64_t >, std::vector< uint64_t > >(V0,V1);
 	}
 
@@ -845,23 +845,23 @@ struct EdgeSet : public CurEndBase
 			std::pair<uint64_t,cur_end_type> const P = S.top(); S.pop();
 			// makr it as seen
 			seen.insert(P);
-			
+
 			// compute id
 			uint64_t const sid = computeId(P);
-			
+
 			// see if there are any outgoing edges
 			if ( preedges.find(P.first) != preedges.end() )
 			{
 				// get edges
 				std::vector<OverlapEntry> const & ledges = preedges.find(P.first)->second;
-			
+
 				// iterate over edges
 				for ( uint64_t i = 0; i < ledges.size(); ++i )
 				{
 					OverlapEntry const & OE = ledges[i];
-						
-					// consider only edges on the correct side		
-					if ( 
+
+					// consider only edges on the correct side
+					if (
 						( (P.second == cur_end_left) && isLeftEdge(OE) )
 						||
 						( (P.second == cur_end_right) && isRightEdge(OE) )
@@ -869,37 +869,37 @@ struct EdgeSet : public CurEndBase
 					{
 						// compute new end of path continuation
 						cur_end_type target_end = cur_end_left;
-						
+
 						switch ( OE.orientation )
 						{
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 								target_end = cur_end_right;
 								break;
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 								target_end = cur_end_left;
 								break;
 							default:
 								break;
 						}
-					
-						// target pair	
+
+						// target pair
 						std::pair<uint64_t,cur_end_type> const T(OE.target,target_end);
 						// compute target pair id
 						uint64_t const tid = computeId(T);
 
 						// insert edge
 						subedges[sid].push_back(tid);
-						
+
 						// mark as todo if not already finished
 						if ( seen.find(T) == seen.end() )
-							S.push(T);						
+							S.push(T);
 					}
 				}
 			}
 		}
-		
+
 		return subedges;
 	}
 
@@ -917,56 +917,56 @@ struct EdgeSet : public CurEndBase
 		{
 			std::pair<uint64_t,cur_end_type> const P = S.top(); S.pop();
 			seen.insert(P.first);
-			
+
 			if ( preedges.find(P.first) != preedges.end() )
 			{
 				std::vector<OverlapEntry> const & ledges = preedges.find(P.first)->second;
-			
+
 				for ( uint64_t i = 0; i < ledges.size(); ++i )
 					if ( (P.second == cur_end_left) && isLeftEdge(ledges[i]) )
 					{
 						subedges[P.first].push_back(ledges[i]);
-						
+
 						switch (ledges[i].orientation)
 						{
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 								if ( seen.find(ledges[i].target) == seen.end() )
 									S.push(std::pair<uint64_t,cur_end_type>(ledges[i].target,cur_end_right));
 								break;
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
 								if ( seen.find(ledges[i].target) == seen.end() )
 									S.push(std::pair<uint64_t,cur_end_type>(ledges[i].target,cur_end_left));
 								break;
 							default:
 								assert(0);
 								break;
-						}									
+						}
 					}
 					else if ( (P.second == cur_end_right) && isRightEdge(ledges[i]) )
 					{
 						subedges[P.first].push_back(ledges[i]);
-						
+
 						switch (ledges[i].orientation)
 						{
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 								if ( seen.find(ledges[i].target) == seen.end() )
 									S.push(std::pair<uint64_t,cur_end_type>(ledges[i].target,cur_end_right));
 								break;
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 								if ( seen.find(ledges[i].target) == seen.end() )
 									S.push(std::pair<uint64_t,cur_end_type>(ledges[i].target,cur_end_left));
 								break;
 							default:
 								assert(0);
 								break;
-						}									
+						}
 					}
 			}
 		}
-		
+
 		return subedges;
 	}
-	
+
 	// returns true iff component containing root has a border vertex with only left edges
 	static bool hasBorderVertexWithLeftEdge(
 		std::map< uint64_t,std::vector<OverlapEntry> > const & edges,
@@ -977,12 +977,12 @@ struct EdgeSet : public CurEndBase
 		std::stack<uint64_t> S;
 		S.push(root);
 		component.insert(root);
-		
+
 		while ( ! S.empty() )
 		{
 			uint64_t const v = S.top();
 			S.pop();
-			
+
 			if ( edges.find(v) != edges.end() )
 			{
 				std::vector<OverlapEntry> const & V = edges.find(v)->second;
@@ -996,7 +996,7 @@ struct EdgeSet : public CurEndBase
 		}
 
 		for ( std::set<uint64_t>::const_iterator ita = component.begin(); ita != component.end(); ++ita )
-			if ( 
+			if (
 				edges.find(*ita) != edges.end()
 				&&
 				(
@@ -1006,7 +1006,7 @@ struct EdgeSet : public CurEndBase
 				)
 			)
 				return true;
-				
+
 		return false;
 	}
 
@@ -1020,12 +1020,12 @@ struct EdgeSet : public CurEndBase
 		std::stack<uint64_t> S;
 		S.push(root);
 		component.insert(root);
-		
+
 		while ( ! S.empty() )
 		{
 			uint64_t const v = S.top();
 			S.pop();
-			
+
 			if ( edges.find(v) != edges.end() )
 			{
 				std::vector<OverlapEntry> const & V = edges.find(v)->second;
@@ -1039,7 +1039,7 @@ struct EdgeSet : public CurEndBase
 		}
 
 		for ( std::set<uint64_t>::const_iterator ita = component.begin(); ita != component.end(); ++ita )
-			if ( 
+			if (
 				edges.find(*ita) != edges.end()
 				&&
 				(
@@ -1049,7 +1049,7 @@ struct EdgeSet : public CurEndBase
 				)
 			)
 				return true;
-				
+
 		return false;
 	}
 
@@ -1062,12 +1062,12 @@ struct EdgeSet : public CurEndBase
 		std::stack<uint64_t> S;
 		S.push(root);
 		component.insert(root);
-		
+
 		while ( ! S.empty() )
 		{
 			uint64_t const v = S.top();
 			S.pop();
-			
+
 			if ( edges.find(v) != edges.end() )
 			{
 				std::vector<OverlapEntry> const & V = edges.find(v)->second;
@@ -1079,9 +1079,9 @@ struct EdgeSet : public CurEndBase
 					}
 			}
 		}
-		
+
 		for ( std::set<uint64_t>::const_iterator ita = component.begin(); ita != component.end(); ++ita )
-			if ( 
+			if (
 				edges.find(*ita) != edges.end()
 				&&
 				countLeftEdges(edges.find(*ita)->second)
@@ -1089,8 +1089,8 @@ struct EdgeSet : public CurEndBase
 				!countRightEdges(edges.find(*ita)->second)
 			)
 				return *ita;
-				
-		libmaus::exception::LibMausException ex;
+
+		libmaus2::exception::LibMausException ex;
 		ex.getStream() << "getBorderVertexWithLeftEdge called for component without border vertices\n";
 		ex.finish();
 		throw ex;
@@ -1105,12 +1105,12 @@ struct EdgeSet : public CurEndBase
 		std::stack<uint64_t> S;
 		S.push(root);
 		component.insert(root);
-		
+
 		while ( ! S.empty() )
 		{
 			uint64_t const v = S.top();
 			S.pop();
-			
+
 			if ( edges.find(v) != edges.end() )
 			{
 				std::vector<OverlapEntry> const & V = edges.find(v)->second;
@@ -1122,10 +1122,10 @@ struct EdgeSet : public CurEndBase
 					}
 			}
 		}
-		
+
 		std::set<uint64_t> R;
 		for ( std::set<uint64_t>::const_iterator ita = component.begin(); ita != component.end(); ++ita )
-			if ( 
+			if (
 				edges.find(*ita) != edges.end()
 				&&
 				countLeftEdges(edges.find(*ita)->second)
@@ -1146,12 +1146,12 @@ struct EdgeSet : public CurEndBase
 		std::stack<uint64_t> S;
 		S.push(root);
 		component.insert(root);
-		
+
 		while ( ! S.empty() )
 		{
 			uint64_t const v = S.top();
 			S.pop();
-			
+
 			if ( edges.find(v) != edges.end() )
 			{
 				std::vector<OverlapEntry> const & V = edges.find(v)->second;
@@ -1163,9 +1163,9 @@ struct EdgeSet : public CurEndBase
 					}
 			}
 		}
-		
+
 		for ( std::set<uint64_t>::const_iterator ita = component.begin(); ita != component.end(); ++ita )
-			if ( 
+			if (
 				edges.find(*ita) != edges.end()
 				&&
 				countRightEdges(edges.find(*ita)->second)
@@ -1173,8 +1173,8 @@ struct EdgeSet : public CurEndBase
 				!countLeftEdges(edges.find(*ita)->second)
 			)
 				return *ita;
-				
-		libmaus::exception::LibMausException ex;
+
+		libmaus2::exception::LibMausException ex;
 		ex.getStream() << "getBorderVertexWithRightEdge called for component without border vertices\n";
 		ex.finish();
 		throw ex;
@@ -1189,12 +1189,12 @@ struct EdgeSet : public CurEndBase
 		std::stack<uint64_t> S;
 		S.push(root);
 		component.insert(root);
-		
+
 		while ( ! S.empty() )
 		{
 			uint64_t const v = S.top();
 			S.pop();
-			
+
 			if ( edges.find(v) != edges.end() )
 			{
 				std::vector<OverlapEntry> const & V = edges.find(v)->second;
@@ -1206,10 +1206,10 @@ struct EdgeSet : public CurEndBase
 					}
 			}
 		}
-		
+
 		std::set<uint64_t> R;
 		for ( std::set<uint64_t>::const_iterator ita = component.begin(); ita != component.end(); ++ita )
-			if ( 
+			if (
 				edges.find(*ita) != edges.end()
 				&&
 				countRightEdges(edges.find(*ita)->second)
@@ -1220,7 +1220,7 @@ struct EdgeSet : public CurEndBase
 
 		return R;
 	}
-	
+
 	// get set of vertices in connected component containing root
 	static std::set<uint64_t> getConnectedComponent(std::map< uint64_t,std::vector<OverlapEntry> > const & edges, uint64_t const root)
 	{
@@ -1230,11 +1230,11 @@ struct EdgeSet : public CurEndBase
 		std::stack<uint64_t> S;
 		S.push(root);
 		R.insert(root);
-		
+
 		while ( !S.empty() )
 		{
 			uint64_t const s = S.top(); S.pop();
-			
+
 			if ( edges.find(s) != edges.end() )
 			{
 				std::vector<OverlapEntry> const & T = edges.find(s)->second;
@@ -1249,14 +1249,14 @@ struct EdgeSet : public CurEndBase
 				}
 			}
 		}
-		
+
 		return R;
 	}
-	
+
 	void depthFirstLoops(
-		std::pair<uint64_t,cur_end_type> const root, 
-		std::vector< std::pair<uint64_t,cur_end_type> > & S, 
-		std::set< std::pair<uint64_t,cur_end_type> > & onstack, 
+		std::pair<uint64_t,cur_end_type> const root,
+		std::vector< std::pair<uint64_t,cur_end_type> > & S,
+		std::set< std::pair<uint64_t,cur_end_type> > & onstack,
 		std::vector< std::vector< std::pair<uint64_t,cur_end_type> > > & loops
 	)
 	{
@@ -1265,7 +1265,7 @@ struct EdgeSet : public CurEndBase
 		if ( preedges.find(s.first) != preedges.end() )
 		{
 			std::vector<OverlapEntry> const & E = preedges.find(s.first)->second;
-			
+
 			for ( uint64_t i = 0; i < E.size(); ++i )
 				if
 				(
@@ -1277,69 +1277,69 @@ struct EdgeSet : public CurEndBase
 					cur_end_type target_end = cur_end_left;
 					switch ( E[i].orientation )
 					{
-						case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
-						case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+						case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+						case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 							target_end = cur_end_right;
 							break;
-						case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
-						case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+						case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+						case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
 							target_end = cur_end_left;
-							break;			
+							break;
 						default:
-							break;	
+							break;
 					}
-					
+
 					std::pair<uint64_t,cur_end_type> const T(E[i].target,target_end);
-					
+
 					if ( T == root )
 					{
 						S.push_back(root);
 						loops.push_back(S);
-						S.pop_back();	
+						S.pop_back();
 					}
 					else if ( onstack.find(T) == onstack.end() )
 					{
 						onstack.insert(T);
 						S.push_back(T);
-	
+
 						depthFirstLoops(root,S,onstack,loops);
-						
+
 						S.pop_back();
 						onstack.erase(onstack.find(T));
 					}
 				}
 		}
 	}
-	
+
 	// break all strongly connected components and store deleted edges in removedEdges
 	void breakStronglyConnectedComponents(std::map<uint64_t,std::vector<OverlapEntry> > & removedEdges, ReadContainer const * RC = 0)
 	{
 		uint64_t d_id = 0;
 		bool changed = true;
-	
+
 		while ( changed )
 		{
 			changed = false;
-		
+
 			// get set of all vertices with outgoing edges
 			std::set<uint64_t> componentunused;
 			for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 				componentunused.insert(ita->first);
-					
+
 			while ( componentunused.size() )
 			{
 				// choose (numerically) smallest remaining vertex
 				uint64_t const root0 = *(componentunused.begin());
 				// get component
 				std::set<uint64_t> const lcomponent = getConnectedComponent(preedges,root0);
-				
+
 				// mark vertices as used
 				for ( std::set<uint64_t>::const_iterator ita = lcomponent.begin(); ita != lcomponent.end(); ++ita )
 				{
 					assert ( componentunused.find(*ita) != componentunused.end() );
 					componentunused.erase(componentunused.find(*ita));
 				}
-				
+
 				// try to find a border vertex or use root0 if is is on a circle
 				std::vector< std::pair<uint64_t,cur_end_type> > root1V;
 				// collect left border edges
@@ -1367,7 +1367,7 @@ struct EdgeSet : public CurEndBase
 						std::pair<uint64_t,cur_end_type>(root0,cur_end_right)
 					);
 				}
-				
+
 				// iterate over all border edges
 				for ( uint64_t zroot1 = 0; zroot1 < root1V.size(); ++zroot1 )
 				{
@@ -1376,7 +1376,7 @@ struct EdgeSet : public CurEndBase
 					cur_end_type root_cur_end = root1V[zroot1].second;
 
 					std::cerr << "root0=" << root0 << " root1=" << root1 << std::endl;
-					
+
 					#if 0
 					std::map< uint64_t,std::vector<OverlapEntry> > subedges = extractConnectedSubEdges(root1,root_cur_end);
 
@@ -1384,11 +1384,11 @@ struct EdgeSet : public CurEndBase
 
 					if ( ! subedges.size() )
 						continue;
-					
-					
+
+
 					// compute strongly connected components based on 1d edges
 					std::pair< std::vector< uint64_t >, std::vector< uint64_t > > SCC =
-						libmaus::graph::StronglyConnectedComponents::strongConnectContract<OverlapEntry,OverlapEntryTargetProjector>(
+						libmaus2::graph::StronglyConnectedComponents::strongConnectContract<OverlapEntry,OverlapEntryTargetProjector>(
 							subedges,root1
 						);
 					#endif
@@ -1400,16 +1400,16 @@ struct EdgeSet : public CurEndBase
 					for ( uint64_t i = 1; i < SCCshift.second.size(); ++i )
 						if ( SCCshift.second[i]-SCCshift.second[i-1] > 1 )
 						{
-							std::cerr << "graph* contains a non-trivial strongly connected component of size " << SCCshift.second[i]-SCCshift.second[i-1] << " ";						
+							std::cerr << "graph* contains a non-trivial strongly connected component of size " << SCCshift.second[i]-SCCshift.second[i-1] << " ";
 						}
 					#endif
-						
+
 					// look for non trivial strongly connected components
 					for ( uint64_t i = 1; i < SCC.second.size(); ++i )
 						if ( SCC.second[i]-SCC.second[i-1] > 1 )
 						{
 							// std::cerr << "graph contains a non-trivial strongly connected component of size " << SCC.second[i]-SCC.second[i-1] << " ";
-							
+
 							for ( uint64_t j = SCC.second[i-1]; j < SCC.second[i]; ++j )
 								std::cerr << SCC.first[j] << ";";
 
@@ -1419,24 +1419,28 @@ struct EdgeSet : public CurEndBase
 									SCC.first.begin() + SCC.second[i-1],
 									SCC.first.begin() + SCC.second[i]
 								);
-								
+
 								{
 									std::ostringstream fnostr;
 									fnostr << "loopy_" << d_id++;
 									std::string const fnprefix = fnostr.str();
 									std::string const dotfn = fnprefix + ".dot";
-									libmaus::aio::CheckedOutputStream COS(dotfn.c_str());
+									libmaus2::aio::OutputStreamInstance COS(dotfn.c_str());
 									printSubGraph(COS,inside);
 									COS.flush();
-									
+
 									std::ostringstream comstr;
 									std::string const svgfn = fnprefix + ".svg.gz";
 									comstr << "neato -Tsvg " << dotfn << " | gzip -9 > " << svgfn;
-									system(comstr.str().c_str());
-									
+									int const r = system(comstr.str().c_str());
+									if ( r != EXIT_SUCCESS )
+									{
+
+									}
+
 									remove(dotfn.c_str());
 								}
-								
+
 								std::set<uint64_t> outsideConnected;
 								for ( uint64_t j = SCC.second[i-1]; j < SCC.second[i]; ++j )
 								{
@@ -1447,20 +1451,20 @@ struct EdgeSet : public CurEndBase
 										if ( inside.find(E[z].target) == inside.end() )
 											outsideConnected.insert(v);
 								}
-								
+
 								if ( outsideConnected.size() )
 								{
 									std::cerr << " outsideConnected.size()=" << outsideConnected.size() << std::endl;
-									
+
 									for ( std::set<uint64_t>::const_iterator ita = outsideConnected.begin();
 										ita != outsideConnected.end(); ++ita )
 										std::cerr << *ita << ";";
 									std::cerr << " ";
-									
+
 									uint64_t const vroot = *(outsideConnected.begin());
-									
+
 									std::vector< std::vector< std::pair<uint64_t,cur_end_type> > > loops;
-									
+
 									if ( ! loops.size() )
 									{
 										std::vector< std::pair<uint64_t,cur_end_type> > S(1,std::pair<uint64_t,cur_end_type>(vroot,cur_end_left));
@@ -1473,11 +1477,11 @@ struct EdgeSet : public CurEndBase
 										std::set< std::pair<uint64_t,cur_end_type> > onstack;
 										depthFirstLoops(S.front(),S,onstack,loops);
 									}
-									
+
 									std::sort(loops.begin(),loops.end());
-									
+
 									std::cerr << "number of loops " << loops.size() << "\n";
-									
+
 									for ( uint64_t i = 0; i < loops.size(); ++i )
 									{
 										std::vector<uint64_t> C;
@@ -1487,32 +1491,32 @@ struct EdgeSet : public CurEndBase
 											C.push_back(loops[i][j].first);
 										}
 										std::cerr << std::endl;
-										
+
 										std::pair<std::string,double> const contig = createLinearContig(C,*RC);
 										std::cerr << contig.first << std::endl;
 									}
 								}
-								
+
 								#if 0
 								std::pair<std::string,double> const contig = createLinearContig(
 									std::vector<uint64_t>(SCC.first.begin() + SCC.second[i-1],SCC.first.begin()+SCC.second[i]),
 									*RC);
 								std::cerr << " " << contig.first;
-								#endif								
+								#endif
 							}
 
 							// extract the strongly connected sub component
 							std::set<uint64_t> subcomp(SCC.first.begin() + SCC.second[i-1],SCC.first.begin() + SCC.second[i]);
-							
+
 							// minimum number of left and right edges anywhere in the component
 							uint64_t minleftcnt = std::numeric_limits<uint64_t>::max();
 							uint64_t minrightcnt = std::numeric_limits<uint64_t>::max();
-							
+
 							for ( std::set<uint64_t>::const_iterator ita = subcomp.begin(); ita != subcomp.end(); ++ita )
 							{
 								assert ( preedges.find(*ita) != preedges.end() );
 								std::vector<OverlapEntry> const & V = preedges.find(*ita)->second;
-								
+
 								uint64_t lc = 0, rc = 0;
 								for ( uint64_t j = 0; j < V.size(); ++j )
 									if ( subcomp.find(V[j].target) != subcomp.end() )
@@ -1522,19 +1526,19 @@ struct EdgeSet : public CurEndBase
 										else if ( isRightEdge(V[j]) && (subcomp.find(V[j].target) != subcomp.end()) )
 											++rc;
 									}
-									
+
 								minleftcnt = std::min(lc,minleftcnt);
 								minrightcnt = std::min(rc,minrightcnt);
 							}
-							
-							// get minimum number of left or right edges with maximum outside links							
+
+							// get minimum number of left or right edges with maximum outside links
 							uint64_t maxoutlinks = 0;
 							uint64_t maxoutlinknode = 0;
 							for ( std::set<uint64_t>::const_iterator ita = subcomp.begin(); ita != subcomp.end(); ++ita )
 							{
 								assert ( preedges.find(*ita) != preedges.end() );
 								std::vector<OverlapEntry> const & V = preedges.find(*ita)->second;
-								
+
 								uint64_t lc = 0, rc = 0;
 								for ( uint64_t j = 0; j < V.size(); ++j )
 									if ( subcomp.find(V[j].target) != subcomp.end() )
@@ -1549,8 +1553,8 @@ struct EdgeSet : public CurEndBase
 								for ( uint64_t j = 0; j < V.size(); ++j )
 									if ( subcomp.find(V[j].target) == subcomp.end() )
 										++outcnt;
-							
-								if ( 
+
+								if (
 									((minleftcnt <= minrightcnt && lc == minleftcnt)
 									||
 									(minrightcnt < minleftcnt && rc == minrightcnt))
@@ -1562,7 +1566,7 @@ struct EdgeSet : public CurEndBase
 									maxoutlinknode = *ita;
 								}
 							}
-							
+
 							// count number of left and right outgoing edges to outside of component
 							uint64_t outleft = 0;
 							uint64_t outright = 0;
@@ -1582,67 +1586,67 @@ struct EdgeSet : public CurEndBase
 								if ( subcomp.find(RIV[j].first) != subcomp.end() )
 									switch ( RIV[j].second.orientation )
 									{
-										case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
-										case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+										case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+										case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 											inleft++;
 											break;
-										case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
-										case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+										case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+										case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
 											inright++;
 											break;
 										default:
 											break;
 								}
-								
+
 							// std::cerr << "inleft=" << inleft << " inright=" << inright << " outleft=" << outleft << " outright=" << outright << std::endl;
-							
+
 							#if 0
 							for ( uint64_t j = 0; j < V.size(); ++j )
 								std::cerr << V[j] << " " << ((subcomp.find(V[j].target) != subcomp.end())?'+':'-') << std::endl;
 							#endif
-								
+
 							// remove all edges into component (and their reverse edges) for chosen vertex in either left or right direction
 							std::vector<uint64_t> deltargets;
 							if ( (inleft * outright) >= (inright * outleft) )
 							{
 								for ( uint64_t j = 0; j < V.size(); ++j )
-									if ( 
+									if (
 										(subcomp.find(V[j].target) != subcomp.end())
 										&&
 										isRightEdge(V[j])
 									)
-										deltargets.push_back(V[j].target);						
+										deltargets.push_back(V[j].target);
 							}
 							// either we did not use the branch above or it yielded no edges
 							if ( deltargets.size() == 0 )
 							{
 								for ( uint64_t j = 0; j < V.size(); ++j )
-									if ( 
+									if (
 										(subcomp.find(V[j].target) != subcomp.end())
 										&&
 										isLeftEdge(V[j])
 									)
-										deltargets.push_back(V[j].target);						
+										deltargets.push_back(V[j].target);
 							}
 							// either we did not use the branches above or they yielded no edges
 							if ( deltargets.size() == 0 )
 							{
 								for ( uint64_t j = 0; j < V.size(); ++j )
-									if ( 
+									if (
 										(subcomp.find(V[j].target) != subcomp.end())
 										&&
 										isRightEdge(V[j])
 									)
-										deltargets.push_back(V[j].target);						
+										deltargets.push_back(V[j].target);
 							}
-							
+
 							// std::cerr << "number of edge targets removed is " << deltargets.size() << std::endl;
-							
+
 							for ( uint64_t j = 0; j < deltargets.size(); ++j )
 							{
 								uint64_t const src = maxoutlinknode;
 								uint64_t const tgt = deltargets[j];
-								
+
 								if ( hasEdge(src,tgt) )
 								{
 									removedEdges[src].push_back(getEdge(src,tgt));
@@ -1653,35 +1657,35 @@ struct EdgeSet : public CurEndBase
 									removedEdges[tgt].push_back(getEdge(tgt,src));
 									removeEdge(tgt,src);
 								}
-								
+
 								std::cerr << " rm edge " << src << " <-> " << tgt;
-									
+
 								changed = true;
-							}								
-							
+							}
+
 							std::cerr << std::endl;
 						}
 				}
 			}
 		}
 	}
-	
+
 	void disconnectTips(std::map<uint64_t,std::vector<OverlapEntry> > & removedEdges)
 	{
 		// remove long tips
 		bool changed = true;
-		
+
 		while ( changed )
 		{
 			changed = false;
-		
+
 			// remove tips (of any length) from contig until there are no more tips
 			bool foundTip = false;
-			
+
 			std::set<uint64_t> component;
 			for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
-				component.insert(ita->first);	
-				
+				component.insert(ita->first);
+
 			for ( std::set<uint64_t>::const_iterator ita = component.begin(); (!foundTip) && (ita != component.end()); ++ita )
 			{
 				// vertex with edges in one direction only
@@ -1695,15 +1699,15 @@ struct EdgeSet : public CurEndBase
 					if ( foundTip )
 					{
 						// std::cerr << "Found tip at " << *ita << std::endl;
-						
+
 						// get the vertex of the split (one beyond the end of the tip)
 						uint64_t tipsplitvertex = 0;
 						OverlapEntry revedge;
-						
+
 						if ( FUR.cur_end == cur_end_left )
 						{
 							assert ( countLeftEdges(FUR.v) == 1 );
-							tipsplitvertex = getFirstLeftEdge(FUR.v).target;							
+							tipsplitvertex = getFirstLeftEdge(FUR.v).target;
 						}
 						else
 						{
@@ -1724,64 +1728,64 @@ struct EdgeSet : public CurEndBase
 						cur_end_type revcurend = cur_end_left;
 						switch ( revedge.orientation )
 						{
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 								revcurend = cur_end_right;
 								break;
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
 								revcurend = cur_end_left;
 								break;
 							default:
 								break;
 						}
-						
+
 						// get set of all edges from splitting vertex
 						std::vector<OverlapEntry> const & revedges = preedges.find(tipsplitvertex)->second;
-						
+
 						// std::cerr << "number of revedges is " << revedges.size() << std::endl;
-						
+
 						std::vector< std::pair<uint64_t,uint64_t> > tipSeedVector;
-						
+
 						for ( uint64_t i = 0; i < revedges.size(); ++i )
-							if ( 
+							if (
 								(revcurend == cur_end_left && isLeftEdge(revedges[i]))
 								||
 								(revcurend == cur_end_right && isRightEdge(revedges[i]))
 							)
 							{
 								OverlapEntry const & edge = revedges[i];
-								
+
 								// std::cerr << "revedges[]=" << edge << std::endl;
-								
+
 								FollowUniqueResult subFUR;
 								std::deque<uint64_t> subC;
-								
+
 								switch ( edge.orientation )
 								{
-									case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
-									case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+									case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+									case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 										subC.push_back(edge.target);
 										subFUR = followUniqueRightRecord(edge.target,subC);
 										break;
-									case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
-									case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+									case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+									case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
 										subC.push_back(edge.target);
 										subFUR = followUniqueLeftRecord(edge.target,subC);
 										break;
 									default:
 										break;
 								}
-								
+
 								// std::cerr << "subC.size()=" << subC.size() << std::endl;
-								
+
 								assert ( preedges.find(subFUR.v) != preedges.end() );
-								
+
 								bool istip = false;
-								
+
 								// if end is at back of subC
-								if ( 
-									subFUR.v == subC.back() 
+								if (
+									subFUR.v == subC.back()
 									&&
 									subC.size() > 1
 								)
@@ -1790,9 +1794,9 @@ struct EdgeSet : public CurEndBase
 									assert ( hasEdge(subC[subC.size()-1],subC[subC.size()-2]) );
 									assert ( hasReverseEdge(subC[subC.size()-2],subC[subC.size()-1]) );
 									assert ( hasReverseEdge(subC[subC.size()-1],subC[subC.size()-2]) );
-									
-									if ( 
-										isLeftEdge(getEdge(subC[subC.size()-1],subC[subC.size()-2])) 
+
+									if (
+										isLeftEdge(getEdge(subC[subC.size()-1],subC[subC.size()-2]))
 										&&
 										countLeftEdges(subC[subC.size()-1]) == 1
 										&&
@@ -1802,19 +1806,19 @@ struct EdgeSet : public CurEndBase
 										istip = true;
 									}
 									else if (
-										isRightEdge(getEdge(subC[subC.size()-1],subC[subC.size()-2])) 
+										isRightEdge(getEdge(subC[subC.size()-1],subC[subC.size()-2]))
 										&&
 										countRightEdges(subC[subC.size()-1]) == 1
 										&&
 										countLeftEdges(subC[subC.size()-1]) == 0
-									
+
 									)
 									{
 										istip = true;
 									}
 								}
 								// otherwise end is at front
-								else if ( 
+								else if (
 									subFUR.v == subC.front()
 									&&
 									subC.size() > 1
@@ -1825,8 +1829,8 @@ struct EdgeSet : public CurEndBase
 									assert ( hasEdge(subC[0],subC[1]) );
 									assert ( hasReverseEdge(subC[1],subC[0]) );
 									assert ( hasReverseEdge(subC[0],subC[1]) );
-									
-									if ( 
+
+									if (
 										isLeftEdge(getEdge(subC[0],subC[1])) &&
 										countLeftEdges(subC[0]) == 1 &&
 										countRightEdges(subC[0]) == 0
@@ -1849,7 +1853,7 @@ struct EdgeSet : public CurEndBase
 									assert ( hasEdge(subC[0],tipsplitvertex) );
 									assert ( hasEdge(tipsplitvertex,subC[0]) );
 
-									if ( 
+									if (
 										isLeftEdge(getEdge(subC[0],tipsplitvertex)) &&
 										countLeftEdges(subC[0]) == 1 &&
 										countRightEdges(subC[0]) == 0
@@ -1866,24 +1870,24 @@ struct EdgeSet : public CurEndBase
 										istip = true;
 									}
 								}
-								
+
 								if ( istip )
 								{
 									tipSeedVector.push_back(std::pair<uint64_t,uint64_t>(subFUR.v,subC.size()));
 								}
 							}
-							
+
 						std::sort(tipSeedVector.begin(),tipSeedVector.end(),PairSecondComparator<uint64_t,uint64_t,std::greater>());
-						
+
 						assert ( tipSeedVector.size() );
-						
+
 						// check whether all tip seeds actually are tips
 						for ( uint64_t i = 0; foundTip && i < tipSeedVector.size(); ++i )
 						{
 							std::deque<uint64_t> exC;
 							FollowUniqueResult exFUR;
 							bool const tipok = extractTip(tipSeedVector[i].first, exC, exFUR);
-							
+
 							if ( ! tipok )
 								foundTip = false;
 						}
@@ -1897,44 +1901,44 @@ struct EdgeSet : public CurEndBase
 								std::deque<uint64_t> exC;
 								FollowUniqueResult exFUR;
 								bool const tipok = extractTip(tipSeedVector[i].first, exC, exFUR);
-								
+
 								if ( ! tipok )
 								{
 									std::cerr << "extractTip failed for " << tipSeedVector[i].first << std::endl;
 									return;
 									// assert ( tipok );
 								}
-								
+
 								uint64_t const linkvert = exFUR.v;
-								
+
 								std::cerr << "disconnecting tip of length " << tipSeedVector[i].second << " starting at " << linkvert << " from split node " << tipsplitvertex << std::endl;
-								
+
 								if ( hasEdge(tipsplitvertex,linkvert) )
 								{
 									removedEdges[tipsplitvertex].push_back(getEdge(tipsplitvertex,linkvert));
-									removeEdge(tipsplitvertex,linkvert);							
+									removeEdge(tipsplitvertex,linkvert);
 								}
 								if ( hasEdge(linkvert,tipsplitvertex) )
 								{
 									removedEdges[linkvert].push_back(getEdge(linkvert,tipsplitvertex));
 									removeEdge(linkvert,tipsplitvertex);
 								}
-							
-								#if 0	
+
+								#if 0
 								std::cerr << "Removing tip at " << tipSeedVector[i].first << " length " << tipSeedVector[i].second << " branching from " << tipsplitvertex << std::endl;
 								removeEdges(std::vector<uint64_t>(exC.begin(),exC.end()));
 								for ( uint64_t i = 0; i < exC.size(); ++i )
 									component.erase(component.find(exC[i]));
 								#endif
-									
+
 								changed = true;
 							}
 						}
 					}
-				}					
+				}
 			}
 		}
-	
+
 	}
 
 	// compute a linear contig based on a simple consensus of the reads
@@ -1955,22 +1959,22 @@ struct EdgeSet : public CurEndBase
 			assert ( V0.size() != 0 );
 			assert ( V0.size() == 1 );
 			#endif
-			
+
 			std::ostringstream ostr;
 			Pileup pile;
-			
+
 			// length of previous read
 			uint64_t prevreadlen = RC.getRead(vertices[0]).size();
 			// uint64_t prevoverhang = 0;
 			uint64_t offset = 0;
 			uint64_t support = 0;
-			
+
 			// add first read to pile
 			switch ( cur_end )
 			{
 				case cur_end_left:
-					// std::cerr << "adding " << libmaus::fastx::reverseComplementUnmapped(RC.getRead(vertices[0])) << " to pile at offset " << 0 << " for vertex rc " << vertices[0] << std::endl;
-					pile.add ( 0, libmaus::fastx::reverseComplementUnmapped(RC.getRead(vertices[0])) );
+					// std::cerr << "adding " << libmaus2::fastx::reverseComplementUnmapped(RC.getRead(vertices[0])) << " to pile at offset " << 0 << " for vertex rc " << vertices[0] << std::endl;
+					pile.add ( 0, libmaus2::fastx::reverseComplementUnmapped(RC.getRead(vertices[0])) );
 					break;
 				case cur_end_right:
 					// std::cerr << "adding " << (RC.getRead(vertices[0])) << " to pile at offset " << 0 << " for vertex " << vertices[0] << std::endl;
@@ -1992,11 +1996,11 @@ struct EdgeSet : public CurEndBase
 					||
 					(cur_end == cur_end_right && isRightEdge(edge))
 				);
-				// overhang over previous read				
+				// overhang over previous read
 				// uint64_t const overhang = edge.overhang;
 				// overlap between the two reads
 				uint64_t const overlap  = edge.overlap;
-								
+
 				// compute consensus for bases which are no longer covered by the current read
 				for ( uint64_t j = 0; j < prevreadlen-overlap; ++j )
 				{
@@ -2008,30 +2012,30 @@ struct EdgeSet : public CurEndBase
 				// add new read to pile and set current extension end according to edge
 				switch ( edge.orientation )
 				{
-					case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
-					case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+					case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+					case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 						// ostr << RC.getRead(vertices[i]).substr(overlap,overhang);
 						// std::cerr << "adding " << (RC.getRead(vertices[i])) << " to pile at offset " << offset << " for vertex " << vertices[i] << std::endl;
 						pile.add(offset,RC.getRead(vertices[i]));
 						cur_end = cur_end_right;
 						break;
-					case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
-					case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-						// ostr << libmaus::fastx::reverseComplementUnmapped(RC.getRead(vertices[i])).substr(overlap,overhang);
-						// std::cerr << "adding " << libmaus::fastx::reverseComplementUnmapped(RC.getRead(vertices[i])) << " to pile at offset " << offset << " for vertex rc " << vertices[i] << std::endl;
-						pile.add(offset,libmaus::fastx::reverseComplementUnmapped(RC.getRead(vertices[i])));
+					case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+					case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+						// ostr << libmaus2::fastx::reverseComplementUnmapped(RC.getRead(vertices[i])).substr(overlap,overhang);
+						// std::cerr << "adding " << libmaus2::fastx::reverseComplementUnmapped(RC.getRead(vertices[i])) << " to pile at offset " << offset << " for vertex rc " << vertices[i] << std::endl;
+						pile.add(offset,libmaus2::fastx::reverseComplementUnmapped(RC.getRead(vertices[i])));
 						cur_end = cur_end_left;
 						break;
 					default:
 						break;
 				}
-				
+
 				// length of previous read
 				prevreadlen = RC.getRead(vertices[i]).size();
 				// overhang of previous read
 				// prevoverhang = overhang;
 			}
-			
+
 			// process remaining data
 			// for ( uint64_t j = 0; j < prevoverhang; ++j )
 			for ( uint64_t j = 0; j < prevreadlen; ++j )
@@ -2040,29 +2044,29 @@ struct EdgeSet : public CurEndBase
 				ostr.put( cons.first );
 				support += cons.second;
 			}
-						
+
 			return std::pair<std::string,double>(ostr.str(),static_cast<double>(support)/ostr.str().size() );
 		}
 	}
-	
+
 	bool isLeftTipSeed(uint64_t const i) const
 	{
 		// does vertex have any edges?
 		if ( preedges.find(i) == preedges.end() )
 			return false;
-		
+
 		// get edge list
 		std::vector<OverlapEntry> const & V = preedges.find(i)->second;
-		
+
 		// not a tip seed if it has more than one edge
 		if ( V.size() != 1 )
 			return false;
-		
+
 		// is the edge a left edge?
 		switch ( V[0].orientation )
 		{
-			case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-			case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+			case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+			case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 				return true;
 			default:
 				return false;
@@ -2073,48 +2077,48 @@ struct EdgeSet : public CurEndBase
 	{
 		if ( preedges.find(i) == preedges.end() )
 			return false;
-		
+
 		std::vector<OverlapEntry> const & V = preedges.find(i)->second;
-		
+
 		if ( V.size() != 1 )
 			return false;
-		
+
 		switch ( V[0].orientation )
 		{
-			case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
-			case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+			case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+			case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 				return true;
 			default:
 				return false;
 		}
 	}
-	
+
 	bool isTipSeed(uint64_t const i) const
 	{
 		return isLeftTipSeed(i) || isRightTipSeed(i);
 	}
-	
+
 	bool hasEdge(uint64_t const from, uint64_t const to) const
 	{
 		if ( preedges.find(from) == preedges.end() )
 			return false;
-		
+
 		std::vector<OverlapEntry> const & V = preedges.find(from)->second;
-		
+
 		for ( uint64_t i = 0; i < V.size(); ++i )
 			if ( V[i].target == to )
 				return true;
-		
+
 		return false;
 	}
-	
+
 	OverlapEntry getEdge(uint64_t const from, uint64_t const to) const
 	{
 		if ( ! hasEdge(from,to) )
 		{
 			std::ostringstream ostr;
 			ostr << "getEdge called for non-existant edge " << from << " -> " << to << std::endl;
-			
+
 			if ( preedges.find(from) != preedges.end() )
 			{
 				std::vector<OverlapEntry> const & V = preedges.find(from)->second;
@@ -2127,25 +2131,25 @@ struct EdgeSet : public CurEndBase
 				for ( uint64_t i = 0; i < V.size(); ++i )
 					ostr << to << " -> " << V[i] << std::endl;;
 			}
-			
+
 			fail(ostr.str());
 		}
-			
+
 		std::vector<OverlapEntry> const & V = preedges.find(from)->second;
-		
+
 		for ( uint64_t i = 0; i < V.size(); ++i )
 			if ( V[i].target == to )
 				return V[i];
-		
+
 		fail("getEdge called for non-existent edge");
 		std::terminate();
 	}
-	
+
 	std::vector < std::vector<uint64_t> > findShortContigs(uint64_t const maxfollow = std::numeric_limits<uint64_t>::max()) const
 	{
 		std::vector < std::vector<uint64_t> > R;
 		std::set<uint64_t> removed;
-		
+
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin();
 			ita != preedges.end(); ++ita )
 		{
@@ -2155,48 +2159,48 @@ struct EdgeSet : public CurEndBase
 				std::deque<uint64_t> C;
 				// information about last vertex on unique chain
 				FollowUniqueResult FUR;
-				
+
 				if ( isLeftTipSeed(ita->first) )
 				{
 					C.push_back(ita->first);
-					FUR = followUniqueLeftRecord(ita->first,C,maxfollow);				
+					FUR = followUniqueLeftRecord(ita->first,C,maxfollow);
 				}
 				else if ( isRightTipSeed(ita->first) )
 				{
 					C.push_back(ita->first);
 					FUR = followUniqueRightRecord(ita->first,C,maxfollow);
 				}
-				
-				if ( 
-					C.size() 
-					&& 
-					C.size() <= maxfollow 
+
+				if (
+					C.size()
+					&&
+					C.size() <= maxfollow
 					&&
 					(
 						(
-							FUR.cur_end == cur_end_left 
+							FUR.cur_end == cur_end_left
 							&&
 							countLeftEdges(FUR.v) == 0
 						)
 						||
 						(
-							FUR.cur_end == cur_end_right 
+							FUR.cur_end == cur_end_right
 							&&
-							countRightEdges(FUR.v) == 0					
+							countRightEdges(FUR.v) == 0
 						)
 					)
 				)
 				{
 					for ( uint64_t i = 0; i < C.size(); ++i )
 						removed.insert(C[i]);
-					
+
 					R.push_back(std::vector<uint64_t>(C.begin(),C.end()));
 				}
 			}
-	
+
 		}
-		
-		return R;			
+
+		return R;
 	}
 
 	std::vector < std::vector<uint64_t> > findStraightContigs() const
@@ -2207,25 +2211,25 @@ struct EdgeSet : public CurEndBase
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 		{
 			uint64_t const v = ita->first;
-			
+
 			if ( seen.find(v) == seen.end() )
 			{
 				// set of vertices
 				std::deque<uint64_t> C;
-				
+
 				// edges only on one side
-				if ( 
+				if (
 					(countLeftEdges(v) == 1 && countRightEdges(v) == 0)
 					||
 					(countLeftEdges(v) == 0 && countRightEdges(v) == 1)
 				)
 				{
 					cur_end_type cur_end = countLeftEdges(v) ? cur_end_left : cur_end_right;
-					
+
 					uint64_t vv = v;
-					C.push_back(vv);	
-					
-					while ( 
+					C.push_back(vv);
+
+					while (
 						(cur_end == cur_end_left  && countLeftEdges(vv) == 1  && countRightEdges(vv) <= 1)
 						||
 						(cur_end == cur_end_right && countRightEdges(vv) == 1 && countLeftEdges(vv) <=1)
@@ -2235,26 +2239,26 @@ struct EdgeSet : public CurEndBase
 
 						switch ( OE.orientation )
 						{
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 								cur_end = cur_end_left;
 								break;
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 								cur_end = cur_end_right;
 								break;
 							default:
 								break;
 						}
-						
+
 						vv = OE.target;
 						C.push_back(vv);
 					}
-					
+
 					for ( uint64_t i = 0; i < C.size(); ++i )
 						seen.insert(C[i]);
-						
-					if ( 
+
+					if (
 						(cur_end == cur_end_left && countLeftEdges(vv) == 0)
 						||
 						(cur_end == cur_end_right && countRightEdges(vv) == 0)
@@ -2265,10 +2269,10 @@ struct EdgeSet : public CurEndBase
 				}
 			}
 		}
-		
+
 		return R;
 	}
-	
+
 	static std::set<uint64_t> flipLowBit(std::set<uint64_t> const & S)
 	{
 		std::set<uint64_t> R;
@@ -2276,32 +2280,32 @@ struct EdgeSet : public CurEndBase
 			R.insert ( *ita ^ 1 );
 		return R;
 	}
-	
+
 	static std::map< uint64_t,std::vector<uint64_t> > getReverseEdgeSet(std::map< uint64_t,std::vector<uint64_t> > const & M)
 	{
 		std::map< uint64_t,std::vector<uint64_t> > R;
-		
+
 		for ( std::map< uint64_t,std::vector<uint64_t> >::const_iterator ita = M.begin(); ita != M.end(); ++ita )
 		{
 			uint64_t const v = ita->first;
 			std::vector<uint64_t> const & V = ita->second;
-			
+
 			for ( uint64_t i = 0; i < V.size(); ++i )
 				R[V[i]].push_back(v);
 		}
-		
+
 		return R;
 	}
 
-	void findBubbles(std::map<uint64_t,std::vector<OverlapEntry> > & removedEdges, ReadContainer const * RC = 0, std::string const * prefix = 0)
+	void findBubbles(std::map<uint64_t,std::vector<OverlapEntry> > & /* removedEdges */, ReadContainer const * RC = 0, std::string const * prefix = 0)
 	{
 		// set of unused vertices
 		std::set<uint64_t> unused;
-		
+
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 			unused.insert(ita->first);
-		
-			
+
+
 		// component id
 		for ( uint64_t componentid = 0 ; unused.size(); ++componentid )
 		{
@@ -2311,13 +2315,13 @@ struct EdgeSet : public CurEndBase
 			std::set<uint64_t> component;
 			S.push(root);
 			component.insert(root);
-			
+
 			// get connected component in undirected graph
 			while ( !S.empty() )
 			{
 				uint64_t const v = S.top();
 				S.pop();
-				
+
 				if ( preedges.find(v) != preedges.end() )
 				{
 					std::vector<OverlapEntry> const & V = preedges.find(v)->second;
@@ -2329,7 +2333,7 @@ struct EdgeSet : public CurEndBase
 						}
 				}
 			}
-			
+
 			// erase all vertices in the component
 			for ( std::set<uint64_t>::const_iterator ita = component.begin(); ita != component.end(); ++ita )
 			{
@@ -2344,7 +2348,7 @@ struct EdgeSet : public CurEndBase
 			cur_end_type root_cur_end;
 			#endif
 			std::map< uint64_t,std::vector<OverlapEntry> > subedges;
-			
+
 			#if 0
 			if ( hasBorderVertexWithLeftEdge(preedges,root0) )
 			{
@@ -2390,23 +2394,23 @@ struct EdgeSet : public CurEndBase
 					std::pair<uint64_t,cur_end_type>(root0,cur_end_right)
 				);
 			}
-			
+
 			std::cerr << std::string(80,'-') << std::endl;
 			std::set < std::set<uint64_t> > vertsetsseen;
-			
+
 			for ( uint64_t root1Vi = 0; root1Vi < root1V.size(); ++root1Vi )
 			{
 				// id of bubble
 				uint64_t bubbleid = 0;
-				
+
 				std::pair<uint64_t,cur_end_type> const root = root1V[root1Vi];
-				
+
 				std::cerr << "root " << root.first << "," << root.second << std::endl;
-				
+
 				// extract component of end annotated vertices
 				std::map< uint64_t,std::vector<uint64_t> > const subedges = extractConnectedSubEdgesShift(root.first,root.second);
 				std::map< uint64_t,std::vector<uint64_t> > const rsubedges = getReverseEdgeSet(subedges);
-				
+
 				std::set<uint64_t> vertset;
 				for ( std::map< uint64_t,std::vector<uint64_t> >::const_iterator ita = subedges.begin(); ita != subedges.end(); ++ita )
 				{
@@ -2415,39 +2419,39 @@ struct EdgeSet : public CurEndBase
 					for ( uint64_t i = 0; i < ledges.size(); ++i )
 						vertset.insert(ledges[i]);
 				}
-					
+
 				if ( vertsetsseen.find(flipLowBit(vertset)) == vertsetsseen.end() )
 				{
 					vertsetsseen.insert(vertset);
 
 					// compute topological sorting starting from cnode
-					std::pair<bool,std::map<uint64_t,uint64_t> > const TS = libmaus::graph::TopologicalSorting::topologicalSorting(
+					std::pair<bool,std::map<uint64_t,uint64_t> > const TS = libmaus2::graph::TopologicalSorting::topologicalSorting(
 						subedges,
 						computeId(root),
-						libmaus::graph::IdentityTargetProjector()
+						libmaus2::graph::IdentityTargetProjector()
 					);
-					
+
 					if ( TS.first )
 					{
 						typedef std::pair<uint64_t,uint64_t> u8p;
 						std::stack<u8p> S;
 						S.push(u8p(computeId(root),0));
 						std::vector< std::vector<uint64_t> > allpaths(1);
-						
+
 						while ( !S.empty() )
 						{
 							u8p const cur = S.top();
 							S.pop();
-							
+
 							allpaths[cur.second].push_back(cur.first);
-							
+
 							if ( subedges.find(cur.first) != subedges.end() && subedges.find(cur.first)->second.size() )
 							{
 								std::vector<uint64_t> const & E = subedges.find(cur.first)->second;
-								
+
 								// continue on path
 								S.push(u8p(E[0],cur.second));
-								
+
 								for ( uint64_t i = 1; i < E.size(); ++i )
 								{
 									uint64_t const t = E[i];
@@ -2459,7 +2463,7 @@ struct EdgeSet : public CurEndBase
 								}
 							}
 						}
-						
+
 						struct PathEndComparator
 						{
 							bool operator()(std::vector<uint64_t> const & A, std::vector<uint64_t> const & B) const
@@ -2474,16 +2478,16 @@ struct EdgeSet : public CurEndBase
 									return A.back() < B.back();
 							}
 						};
-						
-						
+
+
 						std::sort(allpaths.begin(),allpaths.end(),PathEndComparator());
-						
+
 						std::cerr << "number of paths is " << allpaths.size() << std::endl;
-						
+
 						if ( RC )
 						{
 							uint64_t nextbubbleid = 0;
-							
+
 							uint64_t plow = 0;
 							while ( plow != allpaths.size() )
 							{
@@ -2502,7 +2506,7 @@ struct EdgeSet : public CurEndBase
 									minlen = std::min(minlen,contig.first.size());
 									maxlen = std::max(maxlen,contig.first.size());
 								}
-								
+
 								std::ostringstream indelstr;
 								if ( maxlen != minlen )
 									indelstr << "indel_" << maxlen-minlen << "_";
@@ -2510,25 +2514,25 @@ struct EdgeSet : public CurEndBase
 								std::ostringstream fnostr;
 								if ( prefix )
 									fnostr << *prefix << '_';
-								fnostr << "bubbles_" 
+								fnostr << "bubbles_"
 									<< ((phigh-plow>1)?"multi_":"single_")
 									<< indelstr.str()
 									<< componentid << "_" << root1Vi << "_" << bubbleid << ".fasta";
 
-								libmaus::aio::CheckedOutputStream COS(fnostr.str());
-									
+								libmaus2::aio::OutputStreamInstance COS(fnostr.str());
+
 								std::cerr << std::string(80,'*') << std::endl;
 								for ( uint64_t i = plow; i < phigh; ++i )
 								{
 									uint64_t const bubbleid = nextbubbleid++;
-									
+
 									#if 0
 									std::cerr << "path[" << i << "]=";
 									for ( uint64_t j = 0; j < allpaths[i].size(); ++j )
 										std::cerr << allpaths[i][j] << ";";
 									std::cerr << std::endl;
 									#endif
-									
+
 									std::vector<uint64_t> nv = allpaths[i];
 									for ( uint64_t j = 0; j < nv.size(); ++j )
 										nv[j] >>= 1;
@@ -2541,17 +2545,17 @@ struct EdgeSet : public CurEndBase
 									for ( uint64_t j = 0; j < nv.size(); ++j )
 										std::cerr << RC->getRead(nv[j]) << "\n";
 									#endif
-										
+
 									std::pair<std::string,double> const contig = createLinearContig(nv,*RC);
 									std::ostringstream ostr;
 									ostr << '>' << componentid << '_' << root1Vi << '_' << bubbleid << ' ' << contig.first.size() << ' ' << contig.second << '\n';
 									ostr << contig.first << std::endl;
-										
+
 									COS << ostr.str();
 								}
 
 								COS.flush();
-									
+
 								plow = phigh;
 							}
 						}
@@ -2560,11 +2564,11 @@ struct EdgeSet : public CurEndBase
 					{
 						std::cerr << "findBubbles: graph starting from " << root.first << "," << root.second << " contains loops" << std::endl;
 					}
-					
+
 					#if 0
 					std::pair<uint64_t,cur_end_type> cnode = root;
-					
-					while ( 
+
+					while (
 						subedges.find(computeId(cnode)) != subedges.end()
 						&&
 						subedges.find(computeId(cnode))->second.size()
@@ -2572,54 +2576,54 @@ struct EdgeSet : public CurEndBase
 					{
 						std::vector<uint64_t> const & pedges = subedges.find(computeId(cnode))->second;
 						assert ( pedges.size() > 0 );
-					
+
 						if ( pedges.size() == 1 )
 						{
 							// follow linear chain
 							std::vector< std::pair<uint64_t,cur_end_type> > lin;
-							
+
 							lin.push_back(cnode);
-							
-							while ( 
+
+							while (
 								subedges.find(computeId(cnode)) != subedges.end() &&
-								subedges.find(computeId(cnode))->second.size()==1 
+								subedges.find(computeId(cnode))->second.size()==1
 							)
 							{
 								cnode = decodeId(subedges.find(computeId(cnode))->second.front());
 								lin.push_back(cnode);
 							}
-						
+
 							std::cerr << "linear chain of length " << lin.size() << std::endl;
 						}
 						else
 						{
 							// compute topological sorting starting from cnode
-							std::pair<bool,std::map<uint64_t,uint64_t> > const TS = libmaus::graph::TopologicalSorting::topologicalSorting(
+							std::pair<bool,std::map<uint64_t,uint64_t> > const TS = libmaus2::graph::TopologicalSorting::topologicalSorting(
 								subedges,
 								computeId(cnode),
-								libmaus::graph::IdentityTargetProjector()
+								libmaus2::graph::IdentityTargetProjector()
 							);
-							
+
 							if ( ! TS.first )
 							{
 								std::cerr << "Graph contains strongly connected components in findBubbles, root=" << root.first << "," << root.second << std::endl;
 								break;
 							}
-							
+
 							std::map<uint64_t,uint64_t> visitcnt;
 							std::set<uint64_t> endnodes;
 							std::stack<uint64_t> S;
 							S.push(computeId(cnode));
-							
+
 							while ( S.size() )
 							{
 								uint64_t const node = S.top();
 								S.pop();
-								
+
 								visitcnt[node]++;
-								
-								if ( 
-									subedges.find(node) != subedges.end() 
+
+								if (
+									subedges.find(node) != subedges.end()
 									&&
 									subedges.find(node)->second.size() != 0
 								)
@@ -2633,16 +2637,16 @@ struct EdgeSet : public CurEndBase
 									endnodes.insert(node);
 								}
 							}
-							
+
 							std::cerr << "number of end nodes " << endnodes.size() << std::endl;
-							
+
 							#if 0
 							struct QueueElement
 							{
 								uint64_t v;
 								uint64_t r;
 								uint64_t pathid;
-								
+
 								QueueElement() : v(0), r(0), pathid(0) {}
 								QueueElement(uint64_t const rv, uint64_t const rr, uint64_t const rpathid) : v(rv), r(rr), pathid(rpathid) {}
 
@@ -2651,12 +2655,12 @@ struct EdgeSet : public CurEndBase
 									return r > O.r;
 								}
 							};
-							
+
 							std::priority_queue < QueueElement > Q;
-							
+
 							std::map<uint64_t,uint64_t> seencnt;
 							uint64_t activecnt;
-							
+
 							for ( uint64_t i = 0; i < pedges.size(); ++i )
 							{
 								Q.push(
@@ -2668,12 +2672,12 @@ struct EdgeSet : public CurEndBase
 								);
 								activecnt++;
 							}
-							
+
 							while ( Q.size() )
 							{
 								QueueElement const QE = Q.top();
 								Q.pop();
-								
+
 								std::vector<uint64_t> const & ledges = subedges.find(QE.v)->second;
 							}
 							#endif
@@ -2688,12 +2692,12 @@ struct EdgeSet : public CurEndBase
 					std::cerr << "vertex set already seen" << std::endl;
 				}
 			}
-			
+
 			#if 0
 			assert ( root1V.size() );
 			uint64_t root1 = root1V.front().first;
 			cur_end_type root_cur_end = root1V.front().second;
-			
+
 			subedges = extractConnectedSubEdges(root1,root_cur_end);
 
 			// check that edges are all from edges in the component to edges in the component
@@ -2707,16 +2711,16 @@ struct EdgeSet : public CurEndBase
 
 			if ( subedges.size() == 1 )
 				continue;
-						
+
 			cur_end_type cur_end = root_cur_end;
 			uint64_t curvert = root1;
-			
-			std::vector < 
+
+			std::vector <
 				std::vector < std::vector < std::pair<uint64_t,cur_end_type> > >
 			> variantseqs;
-						
-			// while there are any outgoing edges in the relevant direction			
-			while ( 
+
+			// while there are any outgoing edges in the relevant direction
+			while (
 				subedges.find(curvert) != subedges.end()
 				&&
 				(
@@ -2728,9 +2732,9 @@ struct EdgeSet : public CurEndBase
 			{
 				std::vector < std::pair<uint64_t,cur_end_type> > linearStrip;
 				linearStrip.push_back(std::pair<uint64_t,cur_end_type>(curvert,cur_end));
-			
+
 				// follow linear chain until continuation is non existant or non unique
-				while ( 
+				while (
 					subedges.find(curvert) != subedges.end()
 					&&
 					(
@@ -2743,40 +2747,40 @@ struct EdgeSet : public CurEndBase
 					std::vector<OverlapEntry> const & V = subedges.find(curvert)->second;
 					assert ( V.size() );
 					OverlapEntry OE = V[0];
-					
+
 					for ( uint64_t i = 0; i < V.size(); ++i )
-						if ( 
+						if (
 							(isLeftEdge(V[i]) && (cur_end == cur_end_left))
 							||
 							(isRightEdge(V[i]) && (cur_end == cur_end_right))
 						)
 							OE = V[i];
-							
+
 					switch ( OE.orientation )
 					{
-						case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-						case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+						case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+						case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 							cur_end = cur_end_left;
 							break;
-						case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
-						case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+						case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+						case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 							cur_end = cur_end_right;
 							break;
 						default:
-							break;					
+							break;
 					}
 					curvert = OE.target;
 
 					linearStrip.push_back(std::pair<uint64_t,cur_end_type>(curvert,cur_end));
 				}
-				
+
 				#if 1
 				std::cerr << "linear strip: ";
 				for ( uint64_t i = 0; i < linearStrip.size(); ++i )
 					std::cerr << linearStrip[i].first << ((i+1<linearStrip.size())?";":"");
 				std::cerr << std::endl;
 				#endif
-				
+
 				variantseqs.push_back(
 					std::vector < std::vector < std::pair<uint64_t,cur_end_type> > >(
 						1, linearStrip
@@ -2784,7 +2788,7 @@ struct EdgeSet : public CurEndBase
 				);
 
 				// if there are edges
-				if ( 
+				if (
 					subedges.find(curvert) != subedges.end()
 					&&
 					(
@@ -2795,44 +2799,44 @@ struct EdgeSet : public CurEndBase
 				)
 				{
 					std::map< uint64_t,std::vector<uint64_t> > const subedgesshift = extractConnectedSubEdgesShift(curvert,cur_end);
-		
-					std::pair<bool,std::map<uint64_t,uint64_t> > TS = 
-						libmaus::graph::TopologicalSorting::topologicalSorting<uint64_t,libmaus::graph::IdentityTargetProjector>(
-							subedgesshift,computeId(curvert,cur_end),libmaus::graph::IdentityTargetProjector()
+
+					std::pair<bool,std::map<uint64_t,uint64_t> > TS =
+						libmaus2::graph::TopologicalSorting::topologicalSorting<uint64_t,libmaus2::graph::IdentityTargetProjector>(
+							subedgesshift,computeId(curvert,cur_end),libmaus2::graph::IdentityTargetProjector()
 						);
-						
+
 					if ( TS.first )
 					{
 						std::map<uint64_t,uint64_t> TSr;
-						
+
 						for ( std::map<uint64_t,uint64_t>::const_iterator ita = TS.second.begin(); ita != TS.second.end(); ++ita )
 							TSr[ita->first / 2] = ita->second;
-							
+
 						TS.second = TSr;
 					}
 
 					#if 0
-					std::pair<bool,std::map<uint64_t,uint64_t> > TS = 
-						libmaus::graph::TopologicalSorting::topologicalSorting<OverlapEntry,OverlapEntryTargetProjector>(
+					std::pair<bool,std::map<uint64_t,uint64_t> > TS =
+						libmaus2::graph::TopologicalSorting::topologicalSorting<OverlapEntry,OverlapEntryTargetProjector>(
 							subedges,curvert,OverlapEntryTargetProjector()
 						);
 					#endif
-						
+
 					if ( ! TS.first )
 					{
-						libmaus::exception::LibMausException lme;
+						libmaus2::exception::LibMausException lme;
 						lme.getStream() << "Input graph in findBubbles contains cycles" << std::endl;
 						lme.finish();
 						throw lme;
 					}
-					
+
 					struct QueueElement
 					{
 						uint64_t v;
 						uint64_t r;
 						cur_end_type cur_end;
 						uint64_t pathid;
-						
+
 						QueueElement() : v(0), r(0), cur_end(cur_end_left), pathid(0) {}
 						QueueElement(uint64_t const rv, uint64_t const rr, cur_end_type rcur_end, uint64_t const rpathid) : v(rv), r(rr), cur_end(rcur_end), pathid(rpathid) {}
 
@@ -2841,34 +2845,34 @@ struct EdgeSet : public CurEndBase
 							return r > O.r;
 						}
 					};
-					
+
 					std::priority_queue < QueueElement > Q;
 					std::map < std::pair<uint64_t,cur_end_type>, uint64_t > activecnt;
 
 					std::vector<OverlapEntry> const & RV = subedges.find(curvert)->second;
-					
+
 					std::vector< std::vector< std::pair<uint64_t,cur_end_type> > > bubblePaths;
 
 					for ( uint64_t i = 0; i < RV.size(); ++i )
-						if ( 
+						if (
 							(isLeftEdge(RV[i]) && cur_end == cur_end_left)
 							||
 							(isRightEdge(RV[i]) && cur_end == cur_end_right)
 						)
 						{
 							OverlapEntry const & OE = RV[i];
-							
+
 							switch ( OE.orientation )
 							{
-								case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-								case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+								case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+								case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 								{
 									std::vector< std::pair<uint64_t,cur_end_type> > npath;
 									npath.push_back(std::pair<uint64_t,cur_end_type>(curvert,cur_end));
 									npath.push_back(std::pair<uint64_t,cur_end_type>(OE.target,cur_end_left));
 									uint64_t const pathid = bubblePaths.size();
 									bubblePaths.push_back(npath);
-									
+
 									assert ( TS.second.find(OE.target) != TS.second.end() );
 
 									Q.push(
@@ -2879,20 +2883,20 @@ struct EdgeSet : public CurEndBase
 											pathid
 										)
 									);
-									
-									
+
+
 									activecnt[std::pair<uint64_t,cur_end_type>(OE.target,cur_end_left)]++;
 									break;
 								}
-								case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
-								case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+								case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+								case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 								{
 									std::vector< std::pair<uint64_t,cur_end_type> > npath;
 									npath.push_back(std::pair<uint64_t,cur_end_type>(curvert,cur_end));
 									npath.push_back(std::pair<uint64_t,cur_end_type>(OE.target,cur_end_right));
 									uint64_t const pathid = bubblePaths.size();
 									bubblePaths.push_back(npath);
-									
+
 									assert ( TS.second.find(OE.target) != TS.second.end() );
 
 									Q.push(
@@ -2907,7 +2911,7 @@ struct EdgeSet : public CurEndBase
 									break;
 								}
 								default:
-									break;								
+									break;
 							}
 						}
 
@@ -2915,18 +2919,18 @@ struct EdgeSet : public CurEndBase
 					while ( Q.size() && activecnt.size() > 1 )
 					{
 						QueueElement QE = Q.top(); Q.pop();
-						
+
 						if ( ! (--activecnt[std::pair<uint64_t,cur_end_type>(QE.v,QE.cur_end)]) )
 							activecnt.erase(activecnt.find(std::pair<uint64_t,cur_end_type>(QE.v,QE.cur_end)));
-							
+
 						if ( subedges.find(QE.v) != subedges.end() )
 						{
 							std::vector<OverlapEntry> const & RV = subedges.find(QE.v)->second;
 							uint64_t outedges = 0;
 							uint64_t pathid = QE.pathid;
-						
+
 							for ( uint64_t i = 0; i < RV.size(); ++i )
-								if ( 
+								if (
 									(isLeftEdge(RV[i]) && QE.cur_end == cur_end_left)
 									||
 									(isRightEdge(RV[i]) && QE.cur_end == cur_end_right)
@@ -2934,8 +2938,8 @@ struct EdgeSet : public CurEndBase
 								{
 									switch ( RV[i].orientation )
 									{
-										case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-										case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+										case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+										case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 										{
 											if ( outedges )
 											{
@@ -2945,15 +2949,15 @@ struct EdgeSet : public CurEndBase
 												opath.pop_back();
 												bubblePaths.push_back(opath);
 											}
-											
+
 											bubblePaths[pathid].push_back(std::pair<uint64_t,cur_end_type>(RV[i].target,cur_end_left));
 											Q.push(QueueElement(RV[i].target,TS.second.find(RV[i].target)->second,cur_end_left,pathid));
 											activecnt[std::pair<uint64_t,cur_end_type>(RV[i].target,cur_end_left)]++;
 											outedges++;
 											break;
 										}
-										case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
-										case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+										case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+										case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 										{
 											if ( outedges )
 											{
@@ -2971,7 +2975,7 @@ struct EdgeSet : public CurEndBase
 											break;
 										}
 										default:
-											break;								
+											break;
 									}
 								}
 
@@ -2979,58 +2983,58 @@ struct EdgeSet : public CurEndBase
 						else
 						{
 							pathkill.insert(QE.pathid);
-							
+
 							std::cerr << "warning: input graph in findBubbles contains tips" << std::endl;
-							
+
 							#if 0
-							libmaus::exception::LibMausException lme;
+							libmaus2::exception::LibMausException lme;
 							lme.getStream() << "Input graph in findBubbles contains tips" << std::endl;
 							lme.finish();
 							throw lme;
 							#endif
 						}
 					}
-					
+
 					uint64_t o = 0;
 					for ( uint64_t i = 0; i < bubblePaths.size(); ++i )
 						if ( pathkill.find(i) == pathkill.end() )
 							bubblePaths[o++] = bubblePaths[i];
 					bubblePaths.resize(o);
-					
+
 					if ( activecnt.size() == 1 )
 					{
-						std::cerr << "bubble opening at vertex " << curvert << " closing at vertex " << activecnt.begin()->first.first 
+						std::cerr << "bubble opening at vertex " << curvert << " closing at vertex " << activecnt.begin()->first.first
 							<< " paths " << bubblePaths.size()
 							<< std::endl;
-							
+
 						#if 0
 						for ( uint64_t j = 0; j < bubblePaths.size(); ++j )
 						{
 							std::vector< std::pair<uint64_t,cur_end_type> > const & lpath = bubblePaths[j];
-							
+
 							std::cerr << "bubblePath[" << j << "]=";
-							
+
 							for ( uint64_t i = 0; i < lpath.size(); ++i )
 								std::cerr << lpath[i].first << ((i+1<lpath.size())? ";":"");
 							std::cerr << std::endl;
 						}
 						#endif
-						
+
 						variantseqs.push_back(bubblePaths);
-						
+
 						curvert = activecnt.begin()->first.first;
 						cur_end = activecnt.begin()->first.second;
 					}
 					else
 					{
-						libmaus::exception::LibMausException lme;
+						libmaus2::exception::LibMausException lme;
 						lme.getStream() << "Unable to find closing node for bubble starting at node " << curvert << std::endl;
 						lme.finish();
-						throw lme;						
+						throw lme;
 					}
 				}
 			}
-			
+
 			std::cerr << "variant seqs for component id " << componentid << ": ";
 			for ( uint64_t i = 0; i < variantseqs.size(); ++i )
 				std::cerr << variantseqs[i].size() << ";";
@@ -3039,19 +3043,19 @@ struct EdgeSet : public CurEndBase
 			uint64_t prod = 1;
 			for ( uint64_t i = 0; i < variantseqs.size(); ++i )
 				prod *= variantseqs[i].size();
-			
+
 			if ( RC && (prod > 1) )
 			{
 				std::ostringstream fnostr;
-				
+
 				if ( prefix )
 					fnostr << *prefix << "_";
-				
+
 				fnostr << "bubbles_" << (bubbleid++) << ".fasta";
 				std::string const fn = fnostr.str();
-				libmaus::aio::CheckedOutputStream COS(fn);
-			
-					
+				libmaus2::aio::OutputStreamInstance COS(fn);
+
+
 				for ( uint64_t z = 0; z < prod; ++z )
 				{
 					std::vector<uint64_t> idx;
@@ -3061,13 +3065,13 @@ struct EdgeSet : public CurEndBase
 						idx.push_back(zz % variantseqs[i].size());
 						zz /= variantseqs[i].size();
 					}
-					
+
 					std::vector< std::pair<uint64_t,cur_end_type> > path;
 					for ( uint64_t i = 0; i < idx.size(); ++i )
 					{
 						std::vector< std::pair<uint64_t,cur_end_type> > const & subpath =
 							variantseqs[i][idx[i]];
-							
+
 						std::vector< uint64_t > subpathids;
 						for ( uint64_t j = 0; j < subpath.size(); ++j )
 							subpathids.push_back(subpath[j].first);
@@ -3075,11 +3079,11 @@ struct EdgeSet : public CurEndBase
 						std::pair<std::string,double> partcontigdepth = createLinearContig(subpathids,*RC);
 
 						std::cerr << idx[i] << "{" << partcontigdepth.first.size() << "," << partcontigdepth.second << "}";
-						
+
 						if ( variantseqs[i].size() > 1 )
 						{
 							assert ( subpath.size() >= 3 );
-							
+
 							std::vector< uint64_t > subpathids;
 							for ( uint64_t j = 1; j+1 < subpath.size(); ++j )
 								subpathids.push_back(subpath[j].first);
@@ -3088,20 +3092,20 @@ struct EdgeSet : public CurEndBase
 
 							std::cerr << "(" << partcontigdepth.second << ")";
 						}
-						
+
 						std::cerr << ";";
-							
+
 						std::copy(
 							subpath.begin() + (i==0?0:1),
 							subpath.end(),
 							std::back_insert_iterator< std::vector< std::pair<uint64_t,cur_end_type> > >(path)
 						);
 					}
-					
+
 					std::vector<uint64_t> vertices;
 					for ( uint64_t i = 0; i < path.size(); ++i )
 						vertices.push_back(path[i].first);
-					
+
 					std::pair<std::string,double> contigdepth = createLinearContig(vertices,*RC);
 					std::string const contig = contigdepth.first;
 					COS << ">contig_" << componentid << "_" << z << "_" << contig.size() << "_" << contigdepth.second << std::endl;
@@ -3110,7 +3114,7 @@ struct EdgeSet : public CurEndBase
 					std::cerr << " reads " << path.size() << " contig length " << contig.size();
 					std::cerr << std::endl;
 				}
-				
+
 				COS.flush();
 				COS.close();
 			}
@@ -3121,25 +3125,25 @@ struct EdgeSet : public CurEndBase
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 		{
 			uint64_t const v = ita->first;
-			
+
 			if ( seen.find(v) == seen.end() )
 			{
 				// set of vertices
 				std::deque<uint64_t> C;
-				
+
 				// edges only on one side
-				if ( 
+				if (
 					(countLeftEdges(v) == 1 && countRightEdges(v) == 0)
 					||
 					(countLeftEdges(v) == 0 && countRightEdges(v) == 1)
 				)
 				{
 					cur_end_type cur_end = countLeftEdges(v) ? cur_end_left : cur_end_right;
-					
+
 					uint64_t vv = v;
-					C.push_back(vv);	
-					
-					while ( 
+					C.push_back(vv);
+
+					while (
 						(cur_end == cur_end_left  && countLeftEdges(vv) == 1  && countRightEdges(vv) <= 1)
 						||
 						(cur_end == cur_end_right && countRightEdges(vv) == 1 && countLeftEdges(vv) <=1)
@@ -3149,26 +3153,26 @@ struct EdgeSet : public CurEndBase
 
 						switch ( OE.orientation )
 						{
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 								cur_end = cur_end_left;
 								break;
-							case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
-							case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+							case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 								cur_end = cur_end_right;
 								break;
 							default:
 								break;
 						}
-						
+
 						vv = OE.target;
 						C.push_back(vv);
 					}
-					
+
 					for ( uint64_t i = 0; i < C.size(); ++i )
 						seen.insert(C[i]);
-						
-					if ( 
+
+					if (
 						(cur_end == cur_end_left && countLeftEdges(vv) == 0)
 						||
 						(cur_end == cur_end_right && countRightEdges(vv) == 0)
@@ -3179,16 +3183,16 @@ struct EdgeSet : public CurEndBase
 				}
 			}
 		}
-		
+
 		return R;
 		#endif
 	}
-	
-	
+
+
 	std::vector < std::vector<uint64_t> > findTips(uint64_t const maxfollow = std::numeric_limits<uint64_t>::max()) const
 	{
 		std::vector < std::vector<uint64_t> > R;
-		
+
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin();
 			ita != preedges.end(); ++ita )
 		{
@@ -3203,28 +3207,28 @@ struct EdgeSet : public CurEndBase
 				R.push_back(std::vector<uint64_t>(C.begin(),C.end()));
 			}
 		}
-		
+
 		return R;
 	}
-	
+
 	void insertEdges(std::map<uint64_t,std::vector<OverlapEntry> > const & removedEdges)
 	{
 		for ( std::map<uint64_t,std::vector<OverlapEntry> >::const_iterator ita = removedEdges.begin(); ita != removedEdges.end(); ++ita )
 		{
 			std::vector<OverlapEntry> const & V = ita->second;
-			
+
 			for ( uint64_t i = 0; i < V.size(); ++i )
 				if ( ! hasEdge(ita->first,V[i].target) )
 					preedges[ita->first].push_back(V[i]);
 		}
 	}
-	
+
 	template<typename iterator>
 	void removeCrossEdges(iterator ita, iterator ite, std::map<uint64_t,std::vector<OverlapEntry> > & removedEdges)
 	{
 		std::set<uint64_t> S(ita,ite);
 		std::set<uint64_t> Ekill;
-		
+
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::iterator ita = preedges.begin();
 			ita != preedges.end(); ++ita )
 			// node is not in S
@@ -3238,9 +3242,9 @@ struct EdgeSet : public CurEndBase
 						V[o++] = V[i];
 					else
 						removedEdges[ita->first].push_back(V[i]);
-				
+
 				V.resize(o);
-				
+
 				if ( ! o )
 					Ekill.insert(ita->first);
 			}
@@ -3255,49 +3259,49 @@ struct EdgeSet : public CurEndBase
 						V[o++] = V[i];
 					else
 						removedEdges[ita->first].push_back(V[i]);
-				
+
 				V.resize(o);
-				
+
 				if ( ! o )
-					Ekill.insert(ita->first);			
+					Ekill.insert(ita->first);
 			}
-			
+
 		for ( std::set<uint64_t>::const_iterator ita = Ekill.begin(); ita != Ekill.end(); ++ita )
-			preedges.erase(preedges.find(*ita));			
+			preedges.erase(preedges.find(*ita));
 	}
-	
-	void removeEdges(uint64_t const s, ReadContainer const * RC = 0)
+
+	void removeEdges(uint64_t const s, ReadContainer const * /* RC */ = 0)
 	{
 		#if 0
 		if ( RC )
 			std::cerr << "removing edges for read " << RC->getRead(s) << std::endl;
 		#endif
-	
+
 		if ( preedges.find(s) != preedges.end() )
 			preedges.erase(preedges.find(s));
-			
+
 		std::set<uint64_t> vecremove;
-		
+
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::iterator ita = preedges.begin();
 			ita != preedges.end(); ++ita )
 		{
 			std::vector<OverlapEntry> & V = ita->second;
 			uint64_t o = 0;
-			
+
 			for ( uint64_t i = 0; i < V.size(); ++i )
 				if ( V[i].target != s )
 					V[o++] = V[i];
-			
+
 			V.resize(o);
-			
+
 			if ( ! o )
 				vecremove.insert(ita->first);
 		}
-		
+
 		for ( std::set<uint64_t>::const_iterator ita = vecremove.begin(); ita != vecremove.end(); ++ita )
 			preedges.erase(preedges.find(*ita));
 	}
-	
+
 	void removeEdges(std::vector<uint64_t> const & V, ReadContainer const * RC = 0)
 	{
 		for ( uint64_t i = 0; i < V.size(); ++i )
@@ -3311,7 +3315,7 @@ struct EdgeSet : public CurEndBase
 	}
 
 	FollowUniqueResult followUniqueLeft(
-		uint64_t const i, 
+		uint64_t const i,
 		uint64_t maxfollow = std::numeric_limits<uint64_t>::max()
 	) const
 	{
@@ -3320,7 +3324,7 @@ struct EdgeSet : public CurEndBase
 	}
 
 	FollowUniqueResult followUniqueLeftRecord(
-		uint64_t const i, 
+		uint64_t const i,
 		std::deque<uint64_t> & C,
 		uint64_t maxfollow = std::numeric_limits<uint64_t>::max()
 	) const
@@ -3330,7 +3334,7 @@ struct EdgeSet : public CurEndBase
 	}
 
 	FollowUniqueResult followUniqueRight(
-		uint64_t const i, 
+		uint64_t const i,
 		uint64_t maxfollow = std::numeric_limits<uint64_t>::max()
 	) const
 	{
@@ -3339,7 +3343,7 @@ struct EdgeSet : public CurEndBase
 	}
 
 	FollowUniqueResult followUniqueRightRecord(
-		uint64_t const i, 
+		uint64_t const i,
 		std::deque<uint64_t> & C,
 		uint64_t maxfollow = std::numeric_limits<uint64_t>::max()
 	) const
@@ -3347,7 +3351,7 @@ struct EdgeSet : public CurEndBase
 		DequeBackContainer D(C);
 		return followUnique(i,cur_end_right,D,maxfollow);
 	}
-	
+
 	/*
 	 * follow unique chain of edges until we reach a split node (not included) or the end of the chain
 	 *
@@ -3356,7 +3360,7 @@ struct EdgeSet : public CurEndBase
 	 */
 	template<typename container_type>
 	FollowUniqueResult followUnique(
-		uint64_t const i, 
+		uint64_t const i,
 		cur_end_type cur_end,
 		container_type & container,
 		uint64_t maxfollow = std::numeric_limits<uint64_t>::max()
@@ -3364,26 +3368,26 @@ struct EdgeSet : public CurEndBase
 	{
 		uint64_t v = i;
 		uint64_t c = 0;
-		
+
 		bool ok = true;
-		
+
 		while ( ok && c < maxfollow )
 		{
 			ok = false;
-			
+
 			switch ( cur_end )
 			{
 				case cur_end_left:
 					if ( countLeftEdges(v) == 1 )
 					{
 						OverlapEntry OE = getFirstLeftEdge(v);
-						
+
 						// edge ends on the right side of the other read
-						if ( OE.orientation == libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back )
+						if ( OE.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back )
 						{
 							// check that following read has only one outgoing edge in direction and it leads us back to v
-							if ( 
-								countRightEdges(OE.target) == 1 
+							if (
+								countRightEdges(OE.target) == 1
 								&&
 								getFirstRightEdge(OE.target).target == v
 							)
@@ -3392,7 +3396,7 @@ struct EdgeSet : public CurEndBase
 								cur_end = cur_end_left;
 								ok = true;
 								c += 1;
-								
+
 								container(v);
 							}
 						}
@@ -3400,7 +3404,7 @@ struct EdgeSet : public CurEndBase
 						else
 						{
 							// check that following read has only one outgoing edge in direction and it leads us back to v
-							if ( 
+							if (
 								countLeftEdges(OE.target) == 1
 								&&
 								getFirstLeftEdge(OE.target).target == v
@@ -3413,7 +3417,7 @@ struct EdgeSet : public CurEndBase
 
 								container(v);
 							}
-						}						
+						}
 					}
 					break;
 				case cur_end_right:
@@ -3422,11 +3426,11 @@ struct EdgeSet : public CurEndBase
 						OverlapEntry OE = getFirstRightEdge(v);
 
 						// edge ends on the right side of the other read
-						if ( OE.orientation == libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back )
+						if ( OE.orientation == libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back )
 						{
 							// check that following read has only one outgoing edge in direction and it leads us back to v
-							if ( 
-								countRightEdges(OE.target) == 1 
+							if (
+								countRightEdges(OE.target) == 1
 								&&
 								getFirstRightEdge(OE.target).target == v
 							)
@@ -3443,7 +3447,7 @@ struct EdgeSet : public CurEndBase
 						else
 						{
 							// check that following read has only one outgoing edge in direction and it leads us back to v
-							if ( 
+							if (
 								countLeftEdges(OE.target) == 1
 								&&
 								getFirstLeftEdge(OE.target).target == v
@@ -3456,40 +3460,40 @@ struct EdgeSet : public CurEndBase
 
 								container(v);
 							}
-						}						
+						}
 					}
 					break;
 			}
 		}
-		
+
 		return FollowUniqueResult(v,c,cur_end);
 	}
-	
+
 	uint64_t countLeftEdges(uint64_t const i) const
 	{
 		if ( preedges.find(i) == preedges.end() )
 			return 0;
-			
+
 		std::vector<OverlapEntry> const & E = preedges.find(i)->second;
-		
+
 		uint64_t c = 0;
 		for ( uint64_t i = 0; i < E.size(); ++i )
 			switch ( E[i].orientation )
 			{
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 					c++;
 					break;
 				default:
 					break;
 			}
-			
+
 		return c;
 	}
-	
+
 	void fail(std::string const & message) const
 	{
-		libmaus::exception::LibMausException lme;
+		libmaus2::exception::LibMausException lme;
 		lme.getStream() << message << "\n";
 		lme.finish();
 		throw lme;
@@ -3499,20 +3503,20 @@ struct EdgeSet : public CurEndBase
 	{
 		if ( preedges.find(i) == preedges.end() )
 			fail("getFirstLeftEdge() called on vertex with no left edges");
-			
+
 		std::vector<OverlapEntry> const & E = preedges.find(i)->second;
-		
+
 		for ( uint64_t i = 0; i < E.size(); ++i )
 			switch ( E[i].orientation )
 			{
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 					return E[i];
 					break;
 				default:
 					break;
 			}
-			
+
 		fail("getFirstLeftEdge() called on vertex with no left edges");
 		std::terminate();
 	}
@@ -3521,20 +3525,20 @@ struct EdgeSet : public CurEndBase
 	{
 		if ( preedges.find(i) == preedges.end() )
 			fail("getFirstRightEdge() called on vertex with no right edges");
-			
+
 		std::vector<OverlapEntry> const & E = preedges.find(i)->second;
-		
+
 		for ( uint64_t i = 0; i < E.size(); ++i )
 			switch ( E[i].orientation )
 			{
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 					return E[i];
 					break;
 				default:
 					break;
 			}
-			
+
 		fail("getFirstRightEdge() called on vertex with no right edges");
 		std::terminate();
 	}
@@ -3543,23 +3547,23 @@ struct EdgeSet : public CurEndBase
 	{
 		if ( preedges.find(i) == preedges.end() )
 			return 0;
-			
+
 		std::vector<OverlapEntry> const & E = preedges.find(i)->second;
-		
+
 		uint64_t c = 0;
 		for ( uint64_t i = 0; i < E.size(); ++i )
 			switch ( E[i].orientation )
 			{
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 					c++;
 					break;
 				default:
 					break;
 			}
-			
+
 		return c;
-	}	
+	}
 
 	void printSubGraph(std::ostream & out, std::set<uint64_t> const & vertices)
 	{
@@ -3574,7 +3578,7 @@ struct EdgeSet : public CurEndBase
 				for ( uint64_t i = 0; i < ita->second.size(); ++i )
 				{
 					uint64_t t = ita->second[i].target;
-					
+
 					if ( vertices.find(t) != vertices.end() )
 					{
 						if ( s < t )
@@ -3585,7 +3589,7 @@ struct EdgeSet : public CurEndBase
 				}
 			}
 		}
-		
+
 		out << "graph {\n";
 		for ( std::set< std::pair<uint64_t,uint64_t> >::const_iterator ita = P.begin(); ita != P.end(); ++ita )
 		{
@@ -3594,22 +3598,22 @@ struct EdgeSet : public CurEndBase
 			std::string head = "none";
 			// tail: at edge source vertex
 			std::string tail = "none";
-			
+
 			switch ( edge.orientation )
 			{
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front: 
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 					head = "normal"; // right
 					tail = "inv";    // left
 					break;
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back: 
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
 					head = "inv";
 					tail = "normal";
 					break;
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front: 
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 					head = "normal";
 					tail = "normal";
 					break;
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back: 
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 					head = "inv";
 					tail = "inv";
 					break;
@@ -3618,52 +3622,53 @@ struct EdgeSet : public CurEndBase
 			}
 
 			std::string edgestyle = std::string("[dir=both arrowhead=")+head+" arrowtail="+tail+" ]";
-					
-			out << "\t{ \"s" 
+
+			out << "\t{ \"s"
 				<< ita->first
-				<< "\" -- \"s" 
-				<< ita->second << "\" "<<edgestyle<<" ;}\n";			
+				<< "\" -- \"s"
+				<< ita->second << "\" "<<edgestyle<<" ;}\n";
 		}
 		out << "}\n";
 	}
 };
 
-#include <libmaus/lz/PlainOrGzipStream.hpp>
-#include <libmaus/fastx/StreamFastAReader.hpp>
+#include <libmaus2/lz/PlainOrGzipStream.hpp>
+#include <libmaus2/fastx/StreamFastAReader.hpp>
 
 int main(int argc, char * argv[])
 {
 	try
 	{
-		libmaus::util::ArgInfo const arginfo(argc,argv);
-		
+		libmaus2::util::ArgInfo const arginfo(argc,argv);
+
 		std::string const hwtname = arginfo.getUnparsedRestArg(0);
-		std::string const isaname = libmaus::util::OutputFileNameTools::clipOff(hwtname,".hwt") + ".isa";
-		std::string const primedgesname = libmaus::util::OutputFileNameTools::clipOff(hwtname,".hwt") + ".primedges";
-		std::string const cleanededgesname = libmaus::util::OutputFileNameTools::clipOff(hwtname,".hwt") + ".cleanededges";
-		std::string const straightcontigsfa = libmaus::util::OutputFileNameTools::clipOff(hwtname,".hwt") + "_straight_contigs.fa";
-		std::string const straightcontigsfq = libmaus::util::OutputFileNameTools::clipOff(hwtname,".hwt") + "_straight_contigs.fq";
-		std::string const prefix = libmaus::util::OutputFileNameTools::clipOff(hwtname,".hwt");
+		std::string const isaname = libmaus2::util::OutputFileNameTools::clipOff(hwtname,".hwt") + ".isa";
+		std::string const primedgesname = libmaus2::util::OutputFileNameTools::clipOff(hwtname,".hwt") + ".primedges";
+		std::string const cleanededgesname = libmaus2::util::OutputFileNameTools::clipOff(hwtname,".hwt") + ".cleanededges";
+		std::string const straightcontigsfa = libmaus2::util::OutputFileNameTools::clipOff(hwtname,".hwt") + "_straight_contigs.fa";
+		std::string const straightcontigsfq = libmaus2::util::OutputFileNameTools::clipOff(hwtname,".hwt") + "_straight_contigs.fq";
+		std::string const prefix = libmaus2::util::OutputFileNameTools::clipOff(hwtname,".hwt");
 		uint64_t const k = arginfo.getValueUnsignedNumeric("k",12);
 		uint64_t const minreqscore = arginfo.getValueUnsignedNumeric("minreqscore",40);
+		uint64_t const numthreads = arginfo.getValueUnsignedNumeric("threads",1);
 
-		libmaus::fm::BidirectionalDnaIndexImpCompactHuffmanWaveletTree index(hwtname);
-		typedef libmaus::fm::BidirectionalDnaIndexImpCompactHuffmanWaveletTree::lf_type lf_type;
-		libmaus::fm::SampledISA<lf_type>::unique_ptr_type const pISA(libmaus::fm::SampledISA<lf_type>::load(index.LF.get(),isaname));
-		libmaus::fm::SampledISA<lf_type> const & ISA = *pISA;
+		libmaus2::fm::BidirectionalDnaIndexImpCompactHuffmanWaveletTree index(hwtname,numthreads);
+		typedef libmaus2::fm::BidirectionalDnaIndexImpCompactHuffmanWaveletTree::lf_type lf_type;
+		libmaus2::fm::SampledISA<lf_type>::unique_ptr_type const pISA(libmaus2::fm::SampledISA<lf_type>::load(index.LF.get(),isaname));
+		libmaus2::fm::SampledISA<lf_type> const & ISA = *pISA;
 		std::vector<uint64_t> const seqstart = index.getSeqStartPositions();
 		assert ( seqstart.size() % 2 == 0 );
-		
+
 		std::vector<std::string> readnames;
-		
+
 		if ( 1 < arginfo.restargs.size() )
 		{
 			std::string const readsname = arginfo.getUnparsedRestArg(1);
-			libmaus::aio::PosixFdInputStream readsCIS(readsname);
-			libmaus::lz::PlainOrGzipStream readsPOGS(readsCIS);
-			libmaus::fastx::StreamFastAReaderWrapper SFARW(readsPOGS);
-			libmaus::fastx::StreamFastAReaderWrapper::pattern_type pattern;
-			
+			libmaus2::aio::PosixFdInputStream readsCIS(readsname);
+			libmaus2::lz::PlainOrGzipStream readsPOGS(readsCIS);
+			libmaus2::fastx::StreamFastAReaderWrapper SFARW(readsPOGS);
+			libmaus2::fastx::StreamFastAReaderWrapper::pattern_type pattern;
+
 			while ( SFARW.getNextPatternUnlocked(pattern) )
 			{
 				readnames.push_back(pattern.sid);
@@ -3672,31 +3677,31 @@ int main(int argc, char * argv[])
 
 		ReadContainer const RC(index,ISA);
 
-		libmaus::lcs::HammingOverlapDetection const HOD;		
+		libmaus2::lcs::HammingOverlapDetection const HOD;
 
 		std::map< uint64_t,std::vector<OverlapEntry> > preedges;
-		libmaus::parallel::PosixSpinLock preedgeslock;
+		libmaus2::parallel::PosixSpinLock preedgeslock;
 		std::set<uint64_t> dup;
-		libmaus::parallel::PosixSpinLock duplock;
-		libmaus::parallel::PosixSpinLock cerrlock;
+		libmaus2::parallel::PosixSpinLock duplock;
+		libmaus2::parallel::PosixSpinLock cerrlock;
 
-		if ( libmaus::util::GetFileSize::fileExists(cleanededgesname) )
+		if ( libmaus2::util::GetFileSize::fileExists(cleanededgesname) )
 		{
-			loadEdges(preedges, dup, cleanededgesname);		
+			loadEdges(preedges, dup, cleanededgesname);
 		}
 		else
-		{	
-			if ( libmaus::util::GetFileSize::fileExists(primedgesname) )
+		{
+			if ( libmaus2::util::GetFileSize::fileExists(primedgesname) )
 			{
 				loadEdges(preedges, dup, primedgesname);
 			}
 			else
 			{
 				uint64_t const numreads = seqstart.size()/2;
-			
+
 				#if defined(_OPENMP)
 				#pragma omp parallel for schedule(dynamic,1)
-				#endif	
+				#endif
 				for ( uint64_t readid = 0; readid < numreads; readid++ )
 				{
 					uint64_t const start  = seqstart[2*readid];
@@ -3710,19 +3715,19 @@ int main(int argc, char * argv[])
 					{
 						std::string const sub = ref.substr(i,k);
 
-						libmaus::fm::BidirectionalIndexInterval const bint = index.biSearchBackward(sub.begin(), k);
-						
+						libmaus2::fm::BidirectionalIndexInterval const bint = index.biSearchBackward(sub.begin(), k);
+
 						for ( uint64_t i = 0; i < bint.siz; ++i )
 						{
 							uint64_t const rr = bint.spf + i;
 							uint64_t const p = (*index.SA)[rr];
 							uint64_t const seq = findSequence(seqstart,p) >> 1;
-							
+
 							if ( seq != readid )
 								overlapcand.insert(seq);
 						}
 					}
-					
+
 					std::vector<OverlapEntry> ledges;
 					for ( std::set<uint64_t>::const_iterator ita = overlapcand.begin(); ita != overlapcand.end(); ++ita )
 					{
@@ -3732,15 +3737,15 @@ int main(int argc, char * argv[])
 						uint64_t const mr     = ISA[mstart];
 						std::string const mtext  = index.getText(mr,mlen);
 						std::string const umtext = index.getTextUnmapped(mr,mlen);
-						
-						libmaus::lcs::OverlapOrientation::overlap_orientation ori;
+
+						libmaus2::lcs::OverlapOrientation::overlap_orientation ori;
 						uint64_t overhang = 0;
 						int64_t maxscore = 0;
-						
+
 						bool const ok = HOD.detect(
 							uref,umtext,5,ori,overhang,maxscore,false /* verbose */
 						);
-						
+
 						if ( ok && (maxscore >= static_cast<int64_t>(minreqscore)) )
 						{
 							if ( overhang == 0 )
@@ -3749,22 +3754,22 @@ int main(int argc, char * argv[])
 								std::cerr << ori << std::endl;
 								HOD.printOverlap(std::cerr,uref,umtext,ori,overhang);
 								#endif
-								
+
 								if ( readid > mseq )
 								{
-									libmaus::parallel::ScopePosixSpinLock llock(duplock);
+									libmaus2::parallel::ScopePosixSpinLock llock(duplock);
 									dup.insert(readid);
 								}
 							}
 							else
-							{	
-								#if 0			
+							{
+								#if 0
 								std::cerr << ori << std::endl;
 								HOD.printOverlap(std::cerr,uref,umtext,ori,overhang);
 								#endif
-							
+
 								uint64_t const overlap = mlen - overhang;
-								
+
 								OverlapEntry OE(ori,overhang,maxscore,overlap,mseq);
 								ledges.push_back(OE);
 								// std::cerr << OE << std::endl;
@@ -3778,31 +3783,31 @@ int main(int argc, char * argv[])
 					}
 
 					std::sort(ledges.begin(),ledges.end(),OverlapEntryOverlapComparator());
-					
+
 					#if 0
 					if ( ! ledges.size() )
-					{				
-						libmaus::parallel::ScopePosixSpinLock lcerrlock(cerrlock);
+					{
+						libmaus2::parallel::ScopePosixSpinLock lcerrlock(cerrlock);
 						std::cerr << "no edges for " << uref << std::endl;
 					}
 					#endif
-					
+
 					{
-					libmaus::parallel::ScopePosixSpinLock lpreedgeslock(preedgeslock);
+					libmaus2::parallel::ScopePosixSpinLock lpreedgeslock(preedgeslock);
 					preedges[readid] = ledges;
 					}
 
 					if ( (readid) % 4096 == 0 )
 					{
-					libmaus::parallel::ScopePosixSpinLock lcerrlock(cerrlock);
+					libmaus2::parallel::ScopePosixSpinLock lcerrlock(cerrlock);
 					std::cerr << readid << "/" << (seqstart.size()/2) << "\t" << len << "\t" << overlapcand.size() << "\t" << dup.size() << std::endl;
 					}
 				}
 
-				saveEdges(preedges, dup, primedgesname);			
+				saveEdges(preedges, dup, primedgesname);
 			}
 
-			// erase outgoing edges from duplicates                
+			// erase outgoing edges from duplicates
 			for ( std::set<uint64_t>::const_iterator ita = dup.begin(); ita != dup.end(); ++ita )
 				if ( preedges.find(*ita) != preedges.end() )
 					preedges.erase(preedges.find(*ita));
@@ -3812,12 +3817,12 @@ int main(int argc, char * argv[])
 				ita != preedges.end(); ++ita )
 			{
 				std::vector<OverlapEntry> & V = ita->second;
-				
+
 				uint64_t o = 0;
 				for ( uint64_t i = 0; i < V.size(); ++i )
 					if ( dup.find(V[i].target) == dup.end() )
 						V[o++] = V[i];
-						
+
 				V.resize(o);
 			}
 
@@ -3825,10 +3830,10 @@ int main(int argc, char * argv[])
 			for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin();
 				ita != preedges.end(); ++ita )
 				keys.push_back(ita->first);
-			
-			std::cerr << "Computing edge kill list...";	
+
+			std::cerr << "Computing edge kill list...";
 			std::map < uint64_t, std::set<uint64_t> > edgekill;
-			libmaus::parallel::PosixSpinLock edgekilllock;
+			libmaus2::parallel::PosixSpinLock edgekilllock;
 			#if defined(_OPENMP)
 			#pragma omp parallel for
 			#endif
@@ -3838,36 +3843,36 @@ int main(int argc, char * argv[])
 				if ( (ia+1) % 1024 == 0 )
 					std::cerr << (ia+1) << "/" << keys.size() << std::endl;
 				#endif
-				
+
 				uint64_t const a = keys[ia];
 				assert ( preedges.find(a) != preedges.end() );
 				std::vector<OverlapEntry> const & aedges = preedges.find(a)->second;
 				std::set<uint64_t> ledgekill; // = edgekill[a];
-				
+
 				for ( uint64_t i = 0; i < aedges.size(); ++i )
 				{
 					OverlapEntry const & abedge = aedges[i];
 					uint64_t const b = abedge.target;
-					libmaus::lcs::OverlapOrientation::overlap_orientation aborientation = abedge.orientation;
-					
+					libmaus2::lcs::OverlapOrientation::overlap_orientation aborientation = abedge.orientation;
+
 					for ( uint64_t j = i+1; j < aedges.size(); ++j )
 						if ( ledgekill.find(j) == ledgekill.end() )
 						{
 							OverlapEntry const & acedge = aedges[j];
 							uint64_t const c = acedge.target;
 							uint64_t const acoverlap = acedge.overlap;
-							libmaus::lcs::OverlapOrientation::overlap_orientation acorientation = aedges[j].orientation;
-							
+							libmaus2::lcs::OverlapOrientation::overlap_orientation acorientation = aedges[j].orientation;
+
 							if ( preedges.find(b) != preedges.end() )
 							{
 								std::vector<OverlapEntry> const & bedges = preedges.find(b)->second;
-								
+
 								for ( uint64_t z = 0; z < bedges.size(); ++z )
 								{
 									OverlapEntry const & bcedge = bedges[z];
-									
-									if ( 
-										bcedge.target == c 
+
+									if (
+										bcedge.target == c
 										&&
 										acoverlap < bcedge.overlap
 										&&
@@ -3883,7 +3888,7 @@ int main(int argc, char * argv[])
 										// B -> C
 										std::cerr << b << " -> " << bedges[z] << std::endl;
 										#endif
-										
+
 										// kill edge A -> C
 										ledgekill.insert(j);
 									}
@@ -3891,9 +3896,9 @@ int main(int argc, char * argv[])
 							}
 						}
 				}
-				
+
 				{
-				libmaus::parallel::ScopePosixSpinLock ledgekilllock(edgekilllock);
+				libmaus2::parallel::ScopePosixSpinLock ledgekilllock(edgekilllock);
 				edgekill[a] = ledgekill;
 				}
 
@@ -3901,10 +3906,10 @@ int main(int argc, char * argv[])
 				for ( uint64_t i = 0; i < aedges.size(); ++i )
 				{
 					std::cerr << "\t[" << i << "]=" << aedges[i] << " " << ((ledgekill.find(i)!=ledgekill.end())?"K":"") << std::endl;
-					
+
 					#if 0
 					uint64_t const c = aedges[i].target;
-					
+
 					for ( uint64_t j = 0; j < i; ++j )
 					{
 						uint64_t const b = aedges[j].target;
@@ -3921,7 +3926,7 @@ int main(int argc, char * argv[])
 									std::string const read_c = RC.getRead(c);
 
 									{
-									libmaus::lcs::OverlapOrientation::overlap_orientation ori;
+									libmaus2::lcs::OverlapOrientation::overlap_orientation ori;
 									uint64_t overhang = 0;
 									int64_t maxscore = 0;
 									std::cerr << "A -> B" << std::endl;
@@ -3942,38 +3947,38 @@ int main(int argc, char * argv[])
 			std::cerr << "done.\n";
 
 			std::cerr << "Performing transitive reduction...";
-			libmaus::util::Histogram hist;
+			libmaus2::util::Histogram hist;
 			for ( uint64_t ia = 0; ia < keys.size(); ++ia )
 			{
 				uint64_t const a = keys[ia];
-			
+
 				if ( edgekill.find(a) != edgekill.end() )
 				{
 					std::set<uint64_t> const & ks = edgekill.find(a)->second;
 					uint64_t o = 0;
 					std::vector<OverlapEntry> & aedges = preedges.find(a)->second;
-					
+
 					for ( uint64_t i = 0; i < aedges.size(); ++i )
 						if ( ks.find(i) == ks.end() )
 							aedges[o++] = aedges[i];
-							
+
 					aedges.resize(o);
-									
+
 					if ( aedges.size() == 0 )
 						preedges.erase(preedges.find(a));
 					else
 					{
 						hist(aedges.size());
-					}					
+					}
 				}
 			}
 			std::cerr << "done." << std::endl;
 			hist.print(std::cerr);
 			std::cerr << "number of duplicate reads " << dup.size() << std::endl;
-			
+
 			saveEdges(preedges, dup, cleanededgesname);
 		}
-				
+
 		EdgeSet ES(preedges);
 
 		std::cerr << "removing short tips." << std::endl;
@@ -3993,7 +3998,7 @@ int main(int argc, char * argv[])
 
 		std::cerr << "creating linear contigs as fasta...";
 		{
-		libmaus::aio::CheckedOutputStream COS(straightcontigsfa);
+		libmaus2::aio::OutputStreamInstance COS(straightcontigsfa);
 		for ( uint64_t i = 0; i < straight.size(); ++i )
 		{
 			std::string const s = ES.createLinearContig(straight[i],RC).first;
@@ -4003,9 +4008,9 @@ int main(int argc, char * argv[])
 		COS.flush();
 		}
 		std::cerr << "done." << std::endl;
-		
+
 		{
-		libmaus::aio::CheckedOutputStream COS(straightcontigsfq);
+		libmaus2::aio::OutputStreamInstance COS(straightcontigsfq);
 		for ( uint64_t i = 0; i < straight.size(); ++i )
 		{
 			std::string const s = ES.createLinearContig(straight[i],RC).first;
@@ -4035,22 +4040,22 @@ int main(int argc, char * argv[])
 		ES.disconnectTips(removedLongTipEdges);
 		std::cerr << "done." << std::endl;
 		#endif
-		
+
 		#if 1
 		std::cerr << "Checking for bubbles...";
 		std::map<uint64_t,std::vector<OverlapEntry> > removedBubbleEdges;
 		ES.findBubbles(removedBubbleEdges,&RC,&prefix);
 		std::cerr << "done." << std::endl;
 		#endif
-		
+
 		std::cerr << "Collecting unused vertex ids...";
 		std::set<uint64_t> unusedvertices;
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 			unusedvertices.insert(ita->first);
 		std::cerr << "done." << std::endl;
-				
+
 		std::map<uint64_t,uint64_t> cid;
-		
+
 		uint64_t curcid = 0;
 		std::map<uint64_t,std::vector<OverlapEntry> > removedEdges;
 		while ( unusedvertices.size() )
@@ -4066,7 +4071,7 @@ int main(int argc, char * argv[])
 			}
 			else if ( ES.hasBorderVertexWithRightEdge(ES.preedges,*(unusedvertices.begin())) )
 			{
-				root1 = ES.getBorderVertexWithRightEdge(ES.preedges,*(unusedvertices.begin())); 
+				root1 = ES.getBorderVertexWithRightEdge(ES.preedges,*(unusedvertices.begin()));
 				root1end = EdgeSet::cur_end_right;
 			}
 			else
@@ -4074,36 +4079,36 @@ int main(int argc, char * argv[])
 				root1 = (*(unusedvertices.begin()));
 				root1end = EdgeSet::cur_end_left;
 			}
-			
+
 			#if 0
-			uint64_t const root1 = 
-				ES.hasBorderVertexWithLeftEdge(ES.preedges,*(unusedvertices.begin())) ? 
-					ES.getBorderVertexWithLeftEdge(ES.preedges,*(unusedvertices.begin())) 
+			uint64_t const root1 =
+				ES.hasBorderVertexWithLeftEdge(ES.preedges,*(unusedvertices.begin())) ?
+					ES.getBorderVertexWithLeftEdge(ES.preedges,*(unusedvertices.begin()))
 					: (*(unusedvertices.begin()));
 			#endif
 
 			#if 0
 			std::pair< std::vector< uint64_t >, std::vector< uint64_t > > SCC =
-				libmaus::graph::StronglyConnectedComponents::strongConnectContract<OverlapEntry,OverlapEntryTargetProjector>(
+				libmaus2::graph::StronglyConnectedComponents::strongConnectContract<OverlapEntry,OverlapEntryTargetProjector>(
 					ES.extractConnectedSubEdges(prim),root1
 					// ES.preedges,prim
 				);
 			#endif
-				
+
 			// compute strongly connected components based on 1d edges
 			std::pair< std::vector< uint64_t >, std::vector< uint64_t > > const SCC = ES.getStronglyConnectedComponents(root1,root1end);
 
-				
+
 			bool hasloop = false;
 			std::deque<uint64_t> contig;
 			for ( uint64_t i = 1 ; i < SCC.second.size(); ++i )
 				if ( SCC.second[i]-SCC.second[i-1] > 1 )
 				{
 					hasloop = true;
-					
+
 					for ( uint64_t j = SCC.second[i-1]; j < SCC.second[i] ; ++j )
 						contig.push_back(SCC.first[j]);
-						
+
 					ES.removeCrossEdges(
 						SCC.first.begin() + SCC.second[i-1],
 						SCC.first.begin() + SCC.second[i],
@@ -4127,13 +4132,13 @@ int main(int argc, char * argv[])
 			{
 				if ( unusedvertices.find(contig[i]) != unusedvertices.end() )
 					unusedvertices.erase(unusedvertices.find(contig[i]));
-					
+
 				cid [ contig[i] ] = curcid;
 			}
-			
+
 			#if 1
 			std::cerr << "got contig id " << curcid <<" of length size " << contig.size() << " from prim " << prim;
-			
+
 			std::cerr << " left " << contig.front();
 			if ( preedges.find(contig.front()) != preedges.end() )
 				std::cerr << " edges " << preedges.find(contig.front())->second.size();
@@ -4142,19 +4147,19 @@ int main(int argc, char * argv[])
 				std::cerr << " edges " << preedges.find(contig.back())->second.size();
 			std::cerr << std::endl;
 			#endif
-			
+
 			curcid++;
 		}
-		
+
 		// reinsert removed edges
 		ES.insertEdges(removedEdges);
-		
+
 		// get set of undirected edges
 		std::set< std::pair<uint64_t,uint64_t> > P;
 		for ( std::map< uint64_t,std::vector<OverlapEntry> >::const_iterator ita = preedges.begin(); ita != preedges.end(); ++ita )
 		{
 			uint64_t s = ita->first;
-			
+
 			for ( uint64_t i = 0; i < ita->second.size(); ++i )
 			{
 				uint64_t t = ita->second[i].target;
@@ -4164,7 +4169,7 @@ int main(int argc, char * argv[])
 					P.insert(std::pair<uint64_t,uint64_t>(t,s));
 			}
 		}
-		
+
 		std::cout << "graph {\n";
 		std::cout << "\tsplines=\"line\";\n";
 		std::cout << "\toverlap=scale;\n";
@@ -4175,22 +4180,22 @@ int main(int argc, char * argv[])
 			std::string head = "none";
 			// tail: at edge source vertex
 			std::string tail = "none";
-			
+
 			switch ( edge.orientation )
 			{
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front: 
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_front:
 					head = "normal"; // right
 					tail = "inv";    // left
 					break;
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back: 
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_back:
 					head = "inv";
 					tail = "normal";
 					break;
-				case libmaus::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front: 
+				case libmaus2::lcs::OverlapOrientation::overlap_a_front_dovetail_b_front:
 					head = "normal";
 					tail = "normal";
 					break;
-				case libmaus::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back: 
+				case libmaus2::lcs::OverlapOrientation::overlap_a_back_dovetail_b_back:
 					head = "inv";
 					tail = "inv";
 					break;
@@ -4199,25 +4204,25 @@ int main(int argc, char * argv[])
 			}
 
 			std::string edgestyle = std::string("[dir=both arrowhead=")+head+" arrowtail="+tail+" ]";
-					
+
 			if ( ita->first < readnames.size() && ita->second < readnames.size() )
 			{
-				std::cout << "\t{ \"s" 
+				std::cout << "\t{ \"s"
 					<< ita->first << "_" << cid[ita->first] << "_" << readnames.at(ita->first)
-					<< "\" -- \"s" 
+					<< "\" -- \"s"
 					<< ita->second << "_" << cid[ita->second] << "_" << readnames.at(ita->second) << "\" "<<edgestyle<<" ;}\n";
 			}
 			else
 			{
-				std::cout << "\t{ \"s" 
+				std::cout << "\t{ \"s"
 					<< ita->first << "_" << cid[ita->first]
-					<< "\" -- \"s" 
-					<< ita->second << "_" << cid[ita->second] << "\" "<<edgestyle<<" ;}\n";			
+					<< "\" -- \"s"
+					<< ita->second << "_" << cid[ita->second] << "\" "<<edgestyle<<" ;}\n";
 			}
 		}
 		std::cout << "}\n";
 
-		// ES.printEdges(std::cerr);		
+		// ES.printEdges(std::cerr);
 	}
 	catch(std::exception const & ex)
 	{
