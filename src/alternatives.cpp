@@ -3700,7 +3700,7 @@ int main(int argc, char * argv[])
 				uint64_t const numreads = seqstart.size()/2;
 
 				#if defined(_OPENMP)
-				#pragma omp parallel for schedule(dynamic,1)
+				#pragma omp parallel for schedule(dynamic,1) num_threads(numthreads)
 				#endif
 				for ( uint64_t readid = 0; readid < numreads; readid++ )
 				{
@@ -3835,7 +3835,7 @@ int main(int argc, char * argv[])
 			std::map < uint64_t, std::set<uint64_t> > edgekill;
 			libmaus2::parallel::PosixSpinLock edgekilllock;
 			#if defined(_OPENMP)
-			#pragma omp parallel for
+			#pragma omp parallel for num_threads(numthreads)
 			#endif
 			for ( uint64_t ia = 0; ia < keys.size(); ++ia )
 			{
