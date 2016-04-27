@@ -1,4 +1,4 @@
-AC_INIT(alternatives,0.0.0,[gt1@sanger.ac.uk],[alternatives],[http://www.sanger.ac.uk])
+AC_INIT(alternatives,0.0.1,[gt1@sanger.ac.uk],[alternatives],[http://www.sanger.ac.uk])
 AC_CANONICAL_SYSTEM
 AC_PROG_LIBTOOL
 
