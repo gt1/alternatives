@@ -42,72 +42,77 @@ if [ ! -e tools/lib/libz.a ] ; then
 	./configure --prefix=${BUILDDIR}/tools
 	make install
 	cd ..
+	rm -fR zlib-1.2.8
 fi
 
 # build libmaus2
-if [ ! -f libmaus2/lib/libmaus2.a ] ; then
+if [ ! -f ${BUILDDIR}/tools/lib/libmaus2.a ] ; then
 	wget -O - https://github.com/gt1/libmaus2/archive/${LIBMAUS2VERSION}.tar.gz | tar xzf -
 	mv libmaus2-${LIBMAUS2VERSION} libmaus2-${LIBMAUS2VERSION}-src
 	mkdir libmaus2-${LIBMAUS2VERSION}-build
 	cd libmaus2-${LIBMAUS2VERSION}-build
-	../libmaus2-${LIBMAUS2VERSION}-src/configure --prefix=${BUILDDIR}/libmaus2 --disable-compile-testprograms
+	../libmaus2-${LIBMAUS2VERSION}-src/configure --prefix=${BUILDDIR}/tools --disable-compile-testprograms
 	make -j${PROC} install
 	cd ..
 	rm -fR libmaus2-${LIBMAUS2VERSION}-src libmaus2-${LIBMAUS2VERSION}-build
 fi
 
 # build samtools
-if [ ! -f samtools-${SAMTOOLSVERSION}/samtools ] ; then
+if [ ! -f ${BUILDDIR}/tools/bin/samtools ] ; then
 	wget -O - http://downloads.sourceforge.net/project/samtools/samtools/${SAMTOOLSVERSION}/samtools-${SAMTOOLSVERSION}.tar.bz2 | tar xjf -
 	cd samtools-${SAMTOOLSVERSION}
-	make -j${PROC}
+	make -j${PROC} prefix=${BUILDDIR}/tools
+	make -j${PROC} prefix=${BUILDDIR}/tools install
 	cd ..
+	rm -fR samtools-${SAMTOOLSVERSION}
 fi
 
 # compute fa index
 if [ ! -f GRCH38.fa.fai ] ; then
-	samtools-${SAMTOOLSVERSION}/samtools faidx GRCH38.fa
+	${BUILDDIR}/tools/bin/samtools faidx GRCH38.fa
 fi
 
 # build biobambam2
-if [ ! -f biobambam2/bin/bamtofastq ] ; then
+if [ ! -f ${BUILDDIR}/tools/bin/bamtofastq ] ; then
 	wget -O - https://github.com/gt1/biobambam2/archive/${BIOBAMBAM2VERSION}.tar.gz | tar xzf -
 	mv biobambam2-${BIOBAMBAM2VERSION} biobambam2-${BIOBAMBAM2VERSION}-src
 	mkdir -p biobambam2-${BIOBAMBAM2VERSION}-build
 	cd biobambam2-${BIOBAMBAM2VERSION}-build
-	../biobambam2-${BIOBAMBAM2VERSION}-src/configure --with-libmaus2=${BUILDDIR}/libmaus2 --prefix=${BUILDDIR}/biobambam2 --enable-install-experimental
+	../biobambam2-${BIOBAMBAM2VERSION}-src/configure --with-libmaus2=${BUILDDIR}/tools --prefix=${BUILDDIR}/tools --enable-install-experimental
 	make -j${PROC} install
 	cd ..
 	rm -fR biobambam2-${BIOBAMBAM2VERSION}-build biobambam2-${BIOBAMBAM2VERSION}-src
 fi
 
 # build bwtb3m
-if [ ! -f bwtb3m/bin/bwtb3m ] ; then
+if [ ! -f ${BUILDDIR}/tools/bin/bwtb3m ] ; then
 	wget -O - https://github.com/gt1/bwtb3m/archive/${BWTB3MVERSION}.tar.gz | tar xzf -
 	mv bwtb3m-${BWTB3MVERSION} bwtb3m-${BWTB3MVERSION}-src
 	mkdir -p bwtb3m-${BWTB3MVERSION}-build
 	cd bwtb3m-${BWTB3MVERSION}-build
-	../bwtb3m-${BWTB3MVERSION}-src/configure --with-libmaus2=${BUILDDIR}/libmaus2 --prefix=${BUILDDIR}/bwtb3m
+	../bwtb3m-${BWTB3MVERSION}-src/configure --with-libmaus2=${BUILDDIR}/tools --prefix=${BUILDDIR}/tools
 	make -j${PROC} install
 	cd ..
 	rm -fR bwtb3m-${BWTB3MVERSION}-build bwtb3m-${BWTB3MVERSION}-src
 fi
-BWTB3M=${BUILDDIR}/bwtb3m/bin/bwtb3m
-BWTB3MTOBWA=${BUILDDIR}/bwtb3m/bin/bwtb3mtobwa
+BWTB3M=${BUILDDIR}/tools/bin/bwtb3m
+BWTB3MTOBWA=${BUILDDIR}/tools/bin/bwtb3mtobwa
 
 # build bwa
-if [ ! -f bwa-${BWAVERSION}/bwa ] ; then
+if [ ! -e ${BUILDDIR}/tools/bin/bwa ] ; then
 	wget -O - https://github.com/lh3/bwa/releases/download/v${BWAVERSION}/bwa-${BWAVERSION}.tar.bz2 | tar xjf -
 	cd bwa-${BWAVERSION}
 	make -j${PROC}
+	cp bwa ${BUILDDIR}/tools/bin/bwa
 	cd ..
+	rm -fR bwa-${BWAVERSION}
 fi
-BWA=${BUILDDIR}/bwa-${BWAVERSION}/bwa
+BWA=${BUILDDIR}/tools/bin/bwa
 
 # compute index for bwa
 if [ ! -f GRCH38.fa.bwt ] ; then
 	"${BWA}" fa2pac "GRCH38.fa"
-	"${BWTB3M}" inputtype=pacterm mem="${MEMGB}g" outputfilename=GRCH38.fa.pac.bwt GRCH38.fa.pac
+	"${BWTB3M}" threads=${PROC} numthreads=${PROC} inputtype=pacterm mem="${MEMGB}g" outputfilename=GRCH38.fa.pac.bwt GRCH38.fa.pac
 	"${BWTB3MTOBWA}" GRCH38.fa.pac.bwt GRCH38.fa.bwt GRCH38.fa.sa
 	"${BWA}" bwtupdate "GRCH38.fa.bwt"
 	rm -f GRCH38.fa.pac.*
@@ -208,10 +213,11 @@ EOF
 }
 
 # build program for extracting reference regions
-if [ ! -f faextract ] ; then
+if [ ! -f ${BUILDDIR}/tools/bin/faextract ] ; then
 	extractProgram > faextract.cpp
-	FALIBS=`PKG_CONFIG_PATH=${BUILDDIR}/libmaus2/lib/pkgconfig ${BUILDDIR}/tools/bin/pkg-config --libs libmaus2`
-	c++ -std=c++0x -Ilibmaus2/include -Llibmaus2/lib faextract.cpp -ofaextract -lmaus2 -Wl,-rpath=${BUILDDIR}/libmaus2/lib ${FALIBS}
+	FALIBS=`PKG_CONFIG_PATH=${BUILDDIR}/tools/lib/pkgconfig ${BUILDDIR}/tools/bin/pkg-config --libs libmaus2`
+	FACPP=`PKG_CONFIG_PATH=${BUILDDIR}/tools/lib/pkgconfig ${BUILDDIR}/tools/bin/pkg-config --cflags libmaus2`
+	c++ ${FACPP} faextract.cpp -o${BUILDDIR}/tools/bin/faextract -Wl,-rpath=${BUILDDIR}/tools/lib ${FALIBS}
 	rm -f faextract.cpp
 fi
 
@@ -304,20 +310,20 @@ function genemod
 #./faextract GRCH38.fa chr13:32332272-32333387
 
 # modified BRCA2 gene with tandem repeat in exon 10
-( ./faextract GRCH38.fa chr13:32315480-32332271 ; 
-  ./faextract GRCH38.fa chr13:32332272-32332277 ; 
-  ./faextract GRCH38.fa chr13:32332278-32332325 ; 
-  ./faextract GRCH38.fa chr13:32332278-32332325 ; 
-  ./faextract GRCH38.fa chr13:32332326-32399668 ) \
+( ${BUILDDIR}/tools/bin/faextract GRCH38.fa chr13:32315480-32332271 ; 
+  ${BUILDDIR}/tools/bin/faextract GRCH38.fa chr13:32332272-32332277 ; 
+  ${BUILDDIR}/tools/bin/faextract GRCH38.fa chr13:32332278-32332325 ; 
+  ${BUILDDIR}/tools/bin/faextract GRCH38.fa chr13:32332278-32332325 ; 
+  ${BUILDDIR}/tools/bin/faextract GRCH38.fa chr13:32332326-32399668 ) \
   | randomreads 12 # depth 12
 
 # original BRCA2 gene +- 1000
 CRANGE=`zcat refFlat.txt.gz | awk -v GENE=${GENE} '{ if ( match($0,GENE "\t") ) print $3 ":" $5-1000 "-" $6+1000 }'`
-./faextract GRCH38.fa ${CRANGE} | randomreads 20
+${BUILDDIR}/tools/bin/faextract GRCH38.fa ${CRANGE} | randomreads 20
 
 # original BRCA1 gene +- 1000 to simulate off target data
 CRANGE=`zcat refFlat.txt.gz | awk -v GENE=BRCA1 '{ if ( match($0,GENE "\t") ) print $3 ":" $5-1000 "-" $6+1000 }'`
-./faextract GRCH38.fa ${CRANGE} | randomreads 20
+${BUILDDIR}/tools/bin/faextract GRCH38.fa ${CRANGE} | randomreads 20
 }
 
 # we generate reads representing BRCA2 as in the reference and
@@ -327,7 +333,7 @@ CRANGE=`zcat refFlat.txt.gz | awk -v GENE=BRCA1 '{ if ( match($0,GENE "\t") ) pr
 # the reads are mapped to the human reference using BWA mem
 # the resulting SAM files is sorted by coordinate and converted to BAM
 if [ ! -f ${GENE}mod.bam ] ; then
-	genemod | bwa-${BWAVERSION}/bwa mem -p GRCH38.fa - | biobambam2/bin/bamsort inputformat=sam > ${GENE}mod.bam
+	genemod | ${BWA} mem -t 32 -p GRCH38.fa - | ${BUILDDIR}/tools/bin/bamsort inputformat=sam > ${GENE}mod.bam
 fi
 
 INPUT=${GENE}mod.bam
@@ -347,27 +353,27 @@ if [ ! -f ${FILTERED} ] ; then
 		# convert BAM to FastQ, modify names to hide pair information fro BWA,
 		# map reads as single end
 		# sort by coordinate
-		biobambam2/bin/bamtofastq O=/dev/null O2=/dev/null S=/dev/null < ${INPUT} | \
+		${BUILDDIR}/tools/bin/bamtofastq O=/dev/null O2=/dev/null S=/dev/null < ${INPUT} | \
 			awk 'NR%4==1 {sub(/\/1$/,"_one",$0) ; sub(/\/2$/,"_two",$0) ; print} NR%4!=1 {print}' |\
 			${BWA} mem -t ${PROC} GRCH38.fa - | \
-			biobambam2/bin/bamsort index=1 indexfilename=${REMAPPED}.bai inputformat=sam calmdnm=1 fixmates=1 calmdnmreference=GRCH37.fa sortthreads=${PROC} >${REMAPPED}
+			${BUILDDIR}/tools/bin/bamsort index=1 indexfilename=${REMAPPED}.bai inputformat=sam calmdnm=1 fixmates=1 calmdnmreference=GRCH37.fa sortthreads=${PROC} outputthreads=${PROC} >${REMAPPED}
 	fi
 
 	# extract range around target and save names where at least one end map to the target region
-	biobambam2/bin/bamcollate2 ranges="${RANGE}" I=${REMAPPED} | samtools-${SAMTOOLSVERSION}/samtools view -h - | awk -F '\t' '!/@/{sub(/_one|_two/,"",$1) ; print $1}' | sort -u > ${NAMES}
+	${BUILDDIR}/tools/bin/bamcollate2 ranges="${RANGE}" I=${REMAPPED} outputformat=sam | awk -F '\t' '!/@/{sub(/_one|_two/,"",$1) ; print $1}' | sort -u > ${NAMES}
 	# filter reads with matching names from BAM file
-	biobambam2/bin/bamfilternames <${INPUT} names=${NAMES} outputthreads=${PROC} >${FILTERED}
+	${BUILDDIR}/tools/bin/bamfilternames <${INPUT} names=${NAMES} outputthreads=${PROC} >${FILTERED}
 	rm -f ${NAMES} ${REMAPPED} ${REMAPPED}.bai
 fi
 
 if [ ! -f ${FILTERED}.fa.gz ] ; then
 	# extract reads as FastA
-	biobambam2/bin/bamtofastq < "${FILTERED}" fasta=1 O=/dev/null O2=/dev/null S=/dev/null | gzip -9 > ${FILTERED%.bam}.fa.gz
+	${BUILDDIR}/tools/bin/bamtofastq < "${FILTERED}" fasta=1 O=/dev/null O2=/dev/null S=/dev/null | gzip -9 > ${FILTERED%.bam}.fa.gz
 fi
 
 if [ ! -f ${FILTERED%.bam}.compact ] ; then
 	# convert FastA to compact packed representation
-	bwtb3m/bin/fagzToCompact verbose=0 outputfilename=${FILTERED%.bam}.compact ${FILTERED%.bam}.fa.gz
+	${BUILDDIR}/tools/bin/fagzToCompact verbose=0 outputfilename=${FILTERED%.bam}.compact ${FILTERED%.bam}.fa.gz
 fi
 
 if [ ! -f ${FILTERED%.bam}.bwt ] ; then
@@ -376,12 +382,12 @@ if [ ! -f ${FILTERED%.bam}.bwt ] ; then
 fi
 
 # compile alternatives program
-if [ ! -f alternatives/bin/alternatives ] ; then
+if [ ! -f ${BUILDDIR}/tools/bin/alternatives ] ; then
 	wget -O - https://github.com/gt1/alternatives/archive/${ALTERNATIVESVERSION}.tar.gz | tar xzf -
 	mv alternatives-${ALTERNATIVESVERSION} alternatives-${ALTERNATIVESVERSION}-src
 	mkdir -p alternatives-${ALTERNATIVESVERSION}-build
 	cd alternatives-${ALTERNATIVESVERSION}-build
-	../alternatives-${ALTERNATIVESVERSION}-src/configure --with-libmaus2=${BUILDDIR}/libmaus2 --prefix=${BUILDDIR}/alternatives
+	../alternatives-${ALTERNATIVESVERSION}-src/configure --with-libmaus2=${BUILDDIR}/tools --prefix=${BUILDDIR}/tools
 	make -j${PROC} install
 	cd ..
 	rm -fR alternatives-${ALTERNATIVESVERSION}-src alternatives-${ALTERNATIVESVERSION}-build
@@ -389,7 +395,7 @@ fi
 
 if [ ! -f ${FILTERED%.bam}.dot.gz ] ; then
 	# compute assembly (overlap) graph and extract alternatives
-	alternatives/bin/alternatives k=20 minreqscore=125 ${FILTERED%.bam}.hwt | gzip -9 > ${FILTERED%.bam}.dot.gz
+	${BUILDDIR}/tools/bin/alternatives threads=${PROC} k=20 minreqscore=125 ${FILTERED%.bam}.hwt | gzip -9 > ${FILTERED%.bam}.dot.gz
 fi
 
 if [ -e `which neato` ] ; then
@@ -402,27 +408,28 @@ else
 fi
 
 # compile mafft
-if [ ! -f mafft/bin/mafft ] ; then
+if [ ! -f ${BUILDDIR}/tools/bin/mafft ] ; then
 	if [ ! -f mafft-7.213-without-extensions-src.tgz ] ; then
 		wget -c ${MAFFTURL}
 	fi
 	
-	MAFFTINSTDIR=${PWD}/mafft
+	MAFFTINSTDIR=${BUILDDIR}/tools
 	tar xzf mafft-7.213-without-extensions-src.tgz
 	cd mafft-7.213-without-extensions/core
 	make PREFIX=${MAFFTINSTDIR} install
 	cd ../..
 	rm -fR mafft-7.213-without-extensions
+	rm -f mafft-7.213-without-extensions-src.tgz
 fi
 
 # check for alternatives with indels
 for i in ${FILTERED%.bam}_bubbles_multi_indel*.fasta ; do
 	# compute multiple alignment using mafft
 	if [ ! -f ${i%.fasta}_clustal.fasta ] ; then
-		mafft/bin/mafft --clustalout $i > ${i%.fasta}.clustal
+		${BUILDDIR}/tools/bin/mafft --clustalout $i > ${i%.fasta}.clustal
 	fi
 	# align contigs to reference using bwa mem
 	if [ ! -f ${i%.fasta}.bam ] ; then
-		bwa-${BWAVERSION}/bwa mem GRCH38.fa $i | biobambam2/bin/bamsort inputformat=sam > ${i%.fasta}.bam
+		${BWA} mem GRCH38.fa $i | ${BUILDDIR}/tools/bin/bamsort inputformat=sam > ${i%.fasta}.bam
 	fi
 done
