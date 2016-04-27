@@ -13,12 +13,12 @@ The alternatives source code is hosted on github:
 Compilation of alternatives
 ---------------------------
 
-alternatives needs libmaus [https://github.com/gt1/libmaus] . When libmaus
+alternatives needs libmaus2 [https://github.com/gt1/libmaus2] . When libmaus2
 is installed in ${LIBMAUSPREFIX} then alternatives can be compiled and
 installed in ${HOME}/alternatives using
 
 	- autoreconf -i -f
-	- ./configure --with-libmaus=${LIBMAUSPREFIX} \
+	- ./configure --with-libmaus2=${LIBMAUSPREFIX} \
 		--prefix=${HOME}/alternatives
 	- make install
 
